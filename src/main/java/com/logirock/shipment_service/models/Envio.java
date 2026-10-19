@@ -4,7 +4,10 @@ import java.util.UUID;
 
 import com.logirock.shipment_service.enums.EstadoEnvio;
 
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -59,6 +62,32 @@ public class Envio extends Auditable{
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EstadoEnvio estado;
+
+    /**
+     * Dirección de origen desde donde parte el envío.
+     * Se sobreescriben los nombres de las columnas con el prefijo origen_.
+     */
+    @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "calle", column = @Column(name = "origen_calle", nullable = false)),
+            @AttributeOverride(name = "numero", column = @Column(name = "origen_numero", nullable = false)),
+            @AttributeOverride(name = "ciudad", column = @Column(name = "origen_ciudad", nullable = false)),
+            @AttributeOverride(name = "codigoPostal", column = @Column(name = "origen_codigo_postal", nullable = false))
+    })
+    private Direccion origen;
+
+    /**
+     * Dirección de destino hacia donde se dirige el envío.
+     * Se sobreescriben los nombres de las columnas con el prefijo destino_.
+     */
+    @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "calle", column = @Column(name = "destino_calle", nullable = false)),
+            @AttributeOverride(name = "numero", column = @Column(name = "destino_numero", nullable = false)),
+            @AttributeOverride(name = "ciudad", column = @Column(name = "destino_ciudad", nullable = false)),
+            @AttributeOverride(name = "codigoPostal", column = @Column(name = "destino_codigo_postal", nullable = false))
+    })
+    private Direccion destino;
 
     @PrePersist
     private void inicializarEstado() {
