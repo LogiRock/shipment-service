@@ -1,5 +1,6 @@
 package com.logirock.shipment_service.services.impl;
 
+import com.logirock.shipment_service.enums.EstadoEnvio;
 import com.logirock.shipment_service.models.Envio;
 import com.logirock.shipment_service.repositories.EnvioRepository;
 import com.logirock.shipment_service.services.EnvioService;
@@ -75,5 +76,12 @@ public class EnvioServiceImpl implements EnvioService {
     public void eliminar(UUID id) {
         Envio envio = buscarPorId(id);
         envioRepository.delete(envio);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Envio> findByEstado(EstadoEnvio estado) {
+        // TODO Auto-generated method stub
+        return envioRepository.findByEstado(estado);
     }
 }

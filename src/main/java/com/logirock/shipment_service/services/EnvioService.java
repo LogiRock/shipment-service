@@ -1,5 +1,6 @@
 package com.logirock.shipment_service.services;
 
+import com.logirock.shipment_service.enums.EstadoEnvio;
 import com.logirock.shipment_service.models.Envio;
 
 import java.util.List;
@@ -10,6 +11,8 @@ public interface EnvioService {
     Envio crear(Envio envio);
 
     List<Envio> listarTodos();
+
+    List<Envio> findByEstado(EstadoEnvio estado);
 
     Envio buscarPorId(UUID id);
 

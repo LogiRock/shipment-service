@@ -3,6 +3,7 @@ package com.logirock.shipment_service.controllers;
 
 import com.logirock.shipment_service.dto.EnvioRequestDto;
 import com.logirock.shipment_service.dto.EnvioResponseDto;
+import com.logirock.shipment_service.enums.EstadoEnvio;
 import com.logirock.shipment_service.models.Envio;
 import com.logirock.shipment_service.services.EnvioService;
 
@@ -28,7 +29,7 @@ public class EnvioController {
             @Valid @RequestBody EnvioRequestDto request) {
 
         Envio envio = new Envio();
-        
+
         envio.setPeso(request.getPeso());
         envio.setAncho(request.getAncho());
         envio.setAlto(request.getAlto());
@@ -87,7 +88,17 @@ public class EnvioController {
                 envio.getAncho(),
                 envio.getAlto(),
                 envio.getLargo(),
-                envio.getEstado()
-        );
+                envio.getEstado());
     }
+
+    @GetMapping("/estado/{estado}")
+    public List<EnvioResponseDto> buscarPorEstado(
+            @PathVariable EstadoEnvio estado) {
+
+        return envioService.findByEstado(estado)
+                .stream()
+                .map(this::convertirAResponse)
+                .toList();
+    }
+
 }
