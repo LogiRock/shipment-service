@@ -16,9 +16,6 @@ import lombok.Setter;
 @AllArgsConstructor 
 public class EnvioRequestDto {
 
-    @NotBlank(message = "El código de seguimiento es obligatorio")
-    private String codigoSeguimiento;
-
     @NotNull(message = "El peso es obligatorio")
     @Positive(message = "El peso debe ser mayor que cero")
     private Double peso;
