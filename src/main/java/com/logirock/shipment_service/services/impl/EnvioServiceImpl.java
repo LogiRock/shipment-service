@@ -84,4 +84,20 @@ public class EnvioServiceImpl implements EnvioService {
         // TODO Auto-generated method stub
         return envioRepository.findByEstado(estado);
     }
+
+    @Override
+    public Envio cancelar(UUID id) {
+        // TODO Auto-generated method stub
+        Envio envio = buscarPorId(id);
+
+        if (envio.getEstado() != EstadoEnvio.PENDIENTE) {
+            throw new ResponseStatusException(
+                    CONFLICT,
+                    "Solo se pueden cancelar envíos en estado PENDIENTE");
+        }
+
+        envio.setEstado(EstadoEnvio.CANCELADO);
+
+        return envioRepository.save(envio);
+    }
 }

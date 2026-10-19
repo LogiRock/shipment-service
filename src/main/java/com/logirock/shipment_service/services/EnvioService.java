@@ -21,4 +21,6 @@ public interface EnvioService {
     Envio actualizar(UUID id, Envio datos);
 
     void eliminar(UUID id);
+
+    Envio cancelar(UUID id);
 }

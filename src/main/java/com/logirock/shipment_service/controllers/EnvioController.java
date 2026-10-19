@@ -101,4 +101,9 @@ public class EnvioController {
                 .toList();
     }
 
+    @PatchMapping("/{id}/cancelar")
+    public EnvioResponseDto cancelar(@PathVariable UUID id) {
+        return convertirAResponse(envioService.cancelar(id));
+    }
+
 }
