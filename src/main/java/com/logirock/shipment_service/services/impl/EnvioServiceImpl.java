@@ -1,10 +1,12 @@
 package com.logirock.shipment_service.services.impl;
 
+import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
 import com.logirock.shipment_service.models.Envio;
 import com.logirock.shipment_service.repositories.EnvioRepository;
 import com.logirock.shipment_service.services.EnvioService;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -99,5 +101,30 @@ public class EnvioServiceImpl implements EnvioService {
         envio.setEstado(EstadoEnvio.CANCELADO);
 
         return envioRepository.save(envio);
+    }
+
+    @Transactional
+    public EnvioResponseDto cancelarEnvio(UUID id) {
+        Envio envio = envioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún envío con el ID: " + id));
+
+        if (envio.getEstado() != EstadoEnvio.PENDIENTE) {
+            throw new IllegalStateException("Solo se pueden cancelar envíos en estado PENDIENTE.");
+        }
+
+        envio.setEstado(EstadoEnvio.CANCELADO);
+        Envio envioCancelado = envioRepository.save(envio);
+        return mapearAResponseDto(envioCancelado);
+    }
+
+    private EnvioResponseDto mapearAResponseDto(Envio envio) {
+        return new EnvioResponseDto(
+                envio.getId(),
+                envio.getCodigoSeguimiento(),
+                envio.getPeso(),
+                envio.getAncho(),
+                envio.getAlto(),
+                envio.getLargo(),
+                envio.getEstado());
     }
 }
