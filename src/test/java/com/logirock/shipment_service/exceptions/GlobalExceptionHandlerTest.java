@@ -18,6 +18,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.logirock.shipment_service.dto.ErrorResponseDto;
 
@@ -75,6 +76,33 @@ class GlobalExceptionHandlerTest {
         assertNotNull(respuesta.getBody());
         assertEquals(409, respuesta.getBody().getStatus());
         assertEquals("El email ya existe", respuesta.getBody().getMessage());
+    }
+
+    @Test
+    void deberiaConservarElEstadoHttp_CuandoLanzaResponseStatusException() {
+        ResponseStatusException excepcion = new ResponseStatusException(
+                HttpStatus.CONFLICT, "Transición de estado no permitida");
+        when(webRequest.getDescription(false)).thenReturn("uri=/api/envios/1/estado");
+
+        ResponseEntity<ErrorResponseDto> respuesta = globalExceptionHandler
+                .handleResponseStatusException(excepcion, webRequest);
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals(409, respuesta.getBody().getStatus());
+        assertEquals("Transición de estado no permitida", respuesta.getBody().getMessage());
+    }
+
+    @Test
+    void deberiaRetornarConflict_CuandoLanzaIllegalStateException() {
+        IllegalStateException excepcion = new IllegalStateException("El estado actual no permite la operación");
+        when(webRequest.getDescription(false)).thenReturn("uri=/api/envios/1/cancelacion");
+
+        ResponseEntity<ErrorResponseDto> respuesta = globalExceptionHandler
+                .handleIllegalArgumentException(excepcion, webRequest);
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals(409, respuesta.getBody().getStatus());
+        assertEquals("El estado actual no permite la operación", respuesta.getBody().getMessage());
     }
 
     /**

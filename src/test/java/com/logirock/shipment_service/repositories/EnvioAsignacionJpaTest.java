@@ -13,6 +13,7 @@ import org.springframework.test.context.TestPropertySource;
 
 import com.logirock.shipment_service.enums.EstadoEnvio;
 import com.logirock.shipment_service.enums.EstadoRepartidor;
+import com.logirock.shipment_service.models.Cliente;
 import com.logirock.shipment_service.models.Direccion;
 import com.logirock.shipment_service.models.Envio;
 import com.logirock.shipment_service.models.Repartidor;
@@ -38,6 +39,9 @@ class EnvioAsignacionJpaTest {
     private RepartidorRepository repartidorRepository;
 
     @Autowired
+    private ClienteRepository clienteRepository;
+
+    @Autowired
     private EntityManager entityManager;
 
     @Test
@@ -48,8 +52,14 @@ class EnvioAsignacionJpaTest {
         repartidor.setEstado(EstadoRepartidor.ACTIVO);
         repartidor = repartidorRepository.saveAndFlush(repartidor);
 
-        Envio primerEnvio = crearEnvio("ENV-AAAA0001", repartidor);
-        Envio segundoEnvio = crearEnvio("ENV-AAAA0002", repartidor);
+        Cliente cliente = new Cliente();
+        cliente.setNombre("Ana Pérez");
+        cliente.setEmail("ana.asignacion@example.com");
+        cliente.setTelefono("+5491100000000");
+        cliente = clienteRepository.saveAndFlush(cliente);
+
+        Envio primerEnvio = crearEnvio("ENV-AAAA0001", repartidor, cliente);
+        Envio segundoEnvio = crearEnvio("ENV-AAAA0002", repartidor, cliente);
         envioRepository.saveAndFlush(primerEnvio);
         envioRepository.saveAndFlush(segundoEnvio);
         UUID repartidorId = repartidor.getId();
@@ -65,7 +75,7 @@ class EnvioAsignacionJpaTest {
         assertEquals(repartidorId, segundoEnvioPersistido.getRepartidor().getId());
     }
 
-    private Envio crearEnvio(String codigo, Repartidor repartidor) {
+    private Envio crearEnvio(String codigo, Repartidor repartidor, Cliente cliente) {
         Envio envio = new Envio();
         envio.setCodigoSeguimiento(codigo);
         envio.setPeso(2.0);
@@ -76,6 +86,7 @@ class EnvioAsignacionJpaTest {
         envio.setOrigen(direccion());
         envio.setDestino(direccion());
         envio.setRepartidor(repartidor);
+        envio.setCliente(cliente);
         return envio;
     }
 

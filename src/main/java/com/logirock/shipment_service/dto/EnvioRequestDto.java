@@ -1,5 +1,10 @@
 package com.logirock.shipment_service.dto;
 
+import java.util.UUID;
+
+import com.logirock.shipment_service.models.Direccion;
+
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -10,11 +15,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Builder 
-@Getter 
-@Setter 
-@NoArgsConstructor 
-@AllArgsConstructor 
+@Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class EnvioRequestDto {
 
     @Schema(description = "Peso del paquete en kilogramos", example = "2.5", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -36,5 +41,19 @@ public class EnvioRequestDto {
     @NotNull(message = "El largo es obligatorio")
     @Positive(message = "El largo debe ser mayor que cero")
     private Double largo;
+
+    @Schema(description = "Dirección de origen del envío", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Valid
+    @NotNull(message = "La dirección de origen es obligatoria")
+    private Direccion origen;
+
+    @Schema(description = "Dirección de destino del envío", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Valid
+    @NotNull(message = "La dirección de destino es obligatoria")
+    private Direccion destino;
+
+    @Schema(description = "UUID de un cliente existente", example = "2e0d43cc-4fa3-4dc8-9b0d-67f57bb3b001", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "El cliente es obligatorio")
+    private UUID clienteId;
 
 }

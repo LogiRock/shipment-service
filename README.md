@@ -1,26 +1,28 @@
-# shipment-service
+# Shipment Service
 
-Microservicio REST de LogiTrack para gestionar clientes, envíos y repartidores. Forma parte del Sprint 1 de Arquitecturas Avanzadas de Software y está implementado con Java, Spring Boot, Spring Data JPA y MySQL.
+Microservicio REST de LogiTrack para administrar clientes, envíos y repartidores. También permite asignar repartidores, actualizar el estado de los envíos y consultar el historial de esos cambios.
 
 ## Requisitos
 
-- JDK 25 instalado y disponible en `PATH` (`java -version`).
+- JDK 25.
+- MySQL disponible localmente o en un servidor accesible.
 - Git para clonar el repositorio.
-- MySQL accesible desde el equipo, con una base de datos creada para el servicio.
-- PowerShell en Windows para los comandos de esta guía. El repositorio incluye Maven Wrapper (`mvnw.cmd`), por lo que no hace falta instalar Maven por separado. La primera ejecución puede necesitar Internet para descargar Maven y dependencias.
+- PowerShell en Windows para los comandos de esta guía. El repositorio incluye Maven Wrapper, así que no hace falta instalar Maven por separado.
 
-## Preparar el entorno
+La primera ejecución puede necesitar conexión a Internet para descargar Maven y dependencias. No se necesita Docker.
 
-1. Clonar el repositorio y entrar a la carpeta:
+## Configuración y ejecución
+
+1. Clonar el repositorio y abrir la carpeta:
 
    ```powershell
-   git clone <URL_DEL_REPOSITORIO>
+   git clone https://github.com/LogiRock/shipment-service.git
    cd shipment-service
    ```
 
-2. Crear una base de datos vacía en MySQL, por ejemplo `shipment_service`. El esquema se genera/actualiza al iniciar la aplicación mediante Hibernate (`spring.jpa.hibernate.ddl-auto=update`).
+2. Crear en MySQL una base vacía, por ejemplo `shipment_service`.
 
-3. Usar `.env.example` como referencia y definir estas variables en la sesión de PowerShell. Spring Boot **no carga automáticamente** un archivo `.env`; las variables deben estar en el entorno del proceso que inicia Java.
+3. Configurar las variables antes de iniciar la aplicación. Spring Boot no carga automáticamente el archivo `.env`; `.env.example` sirve como referencia. En PowerShell:
 
    ```powershell
    $env:DB_SUBPROTOCOL = "mysql"
@@ -31,67 +33,58 @@ Microservicio REST de LogiTrack para gestionar clientes, envíos y repartidores.
    $env:DB_PASSWORD = "<contraseña_local>"
    ```
 
-   Estos valores duran mientras siga abierta esa sesión de PowerShell. En IntelliJ IDEA, se pueden cargar los mismos nombres y valores en la configuración de ejecución de `ShipmentServiceApplication`.
+   Los valores se conservan mientras siga abierta esa sesión. En IntelliJ IDEA, agregar los mismos nombres y valores en **Run → Edit Configurations → Environment variables** para la configuración de `ShipmentServiceApplication`.
 
-4. Verificar Java e iniciar el servicio:
+4. Iniciar el servicio:
 
    ```powershell
    java -version
    .\mvnw.cmd spring-boot:run
    ```
 
-   La aplicación queda disponible en `http://localhost:8080`. Para compilar el artefacto ejecutable:
+   La aplicación se inicia en `http://localhost:8080`. Hibernate actualiza el esquema al arrancar (`spring.jpa.hibernate.ddl-auto=update`).
 
-   ```powershell
-   .\mvnw.cmd clean package
-   java -jar .\target\shipment-service-0.0.1-SNAPSHOT.jar
-   ```
+También se puede compilar y ejecutar el JAR:
 
-Con la aplicación iniciada, Swagger UI está en `http://localhost:8080/swagger-ui.html` y el documento OpenAPI JSON en `http://localhost:8080/v3/api-docs`. No se necesita Docker para usar Swagger; sí se requiere que el servicio pueda conectarse a MySQL durante el inicio.
+```powershell
+.\mvnw.cmd clean package
+java -jar .\target\shipment-service-0.0.1-SNAPSHOT.jar
+```
 
 ## Variables de entorno
 
 | Variable | Uso | Ejemplo local |
 | --- | --- | --- |
-| `DB_SUBPROTOCOL` | Motor usado en la URL JDBC | `mysql` |
+| `DB_SUBPROTOCOL` | Motor de la URL JDBC | `mysql` |
 | `DB_HOST` | Servidor MySQL | `localhost` |
 | `DB_PORT` | Puerto MySQL | `3306` |
-| `DB_DATABASE_NAME` | Base de datos del servicio | `shipment_service` |
-| `DB_USERNAME` | Usuario de MySQL | `<usuario_local>` |
-| `DB_PASSWORD` | Contraseña del usuario de MySQL | `<contraseña_local>` |
+| `DB_DATABASE_NAME` | Base de datos | `shipment_service` |
+| `DB_USERNAME` | Usuario local de la base | `<usuario_local>` |
+| `DB_PASSWORD` | Contraseña local de la base | `<contraseña_local>` |
 
-No guardar credenciales reales en el README, `.env.example`, el código ni en commits. El archivo `.env` está actualmente bajo seguimiento de Git en este repositorio: agregarlo a `.gitignore` evita nuevos archivos locales sin seguimiento, pero no deja de versionar un archivo que ya está seguido. Antes de compartir cambios, el equipo debe revisar ese archivo y retirar credenciales reales del control de versiones y, si corresponde, rotarlas.
+No guardar contraseñas ni secretos reales en el repositorio. En esta revisión se quitó `.env` del índice de Git sin borrar la copia local; `.gitignore` lo excluye de futuros commits. `.env.example` contiene solo nombres de variables y valores ficticios. Si el archivo versionado anteriormente incluía credenciales reales, deben rotarse: quitarlo del commit actual no elimina las versiones históricas del repositorio.
 
-## Ejecutar pruebas
+## Swagger / OpenAPI
 
-Ejecutar toda la suite:
+Con la aplicación iniciada y conectada a MySQL:
 
-```powershell
-.\mvnw.cmd test
-```
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- Especificación OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 
-La prueba de contexto (`ShipmentServiceApplicationTests`) inicia Spring y requiere que MySQL y las variables de entorno estén configurados. Para correr una prueba unitaria puntual, por ejemplo:
+Swagger permite ver los parámetros, cuerpos, respuestas y probar las operaciones. Los identificadores son UUID y los cuerpos usan JSON con `Content-Type: application/json`.
 
-```powershell
-.\mvnw.cmd "-Dtest=EnvioServiceImplTest" test
-```
-
-Las pruebas existentes usan JUnit 5 y Mockito para servicios, controladores, validaciones y manejo de errores. La prueba de contexto valida el inicio de la aplicación.
-
-## API disponible
-
-Todos los cuerpos son JSON. Los identificadores son UUID. Los endpoints de clientes y repartidores usan el prefijo `/api/v1`; los de envíos usan `/api`.
+## API REST
 
 ### Clientes — `/api/v1/clientes`
 
-| Método | Ruta | Descripción |
+| Método | Ruta | Resultado principal |
 | --- | --- | --- |
-| `POST` | `/api/v1/clientes` | Registrar cliente. Requiere `nombre`, `email` y `telefono`; responde `201`. |
-| `GET` | `/api/v1/clientes/{id}` | Consultar por UUID. |
-| `PUT` | `/api/v1/clientes/{id}` | Modificar nombre, email y teléfono. |
-| `DELETE` | `/api/v1/clientes/{id}` | Eliminar; responde `204`. |
+| `POST` | `/api/v1/clientes` | Registra y devuelve un cliente (`201`). |
+| `GET` | `/api/v1/clientes/{id}` | Devuelve el cliente (`200`). |
+| `PUT` | `/api/v1/clientes/{id}` | Actualiza y devuelve el cliente (`200`). |
+| `DELETE` | `/api/v1/clientes/{id}` | Elimina el cliente (`204`). |
 
-Ejemplo de alta:
+Crear cliente:
 
 ```json
 {
@@ -101,66 +94,136 @@ Ejemplo de alta:
 }
 ```
 
+Nombre, email y teléfono son obligatorios; el email debe tener formato válido. El email y el teléfono deben ser únicos. Una solicitud inválida responde `400`, una duplicada `409` y un UUID inexistente `404`.
+
+### Repartidores — `/api/v1/repartidores`
+
+| Método | Ruta | Resultado principal |
+| --- | --- | --- |
+| `POST` | `/api/v1/repartidores` | Registra y devuelve un repartidor (`201`). |
+| `GET` | `/api/v1/repartidores` | Devuelve todos los repartidores (`200`). |
+| `GET` | `/api/v1/repartidores/{id}` | Devuelve un repartidor (`200`). |
+| `PUT` | `/api/v1/repartidores/{id}` | Actualiza y devuelve el repartidor (`200`). |
+| `DELETE` | `/api/v1/repartidores/{id}` | Elimina el repartidor (`204`). |
+
+Crear repartidor:
+
+```json
+{
+  "nombre": "Juan López",
+  "tipoVehiculo": "Motocicleta",
+  "estado": "ACTIVO"
+}
+```
+
+`estado` admite `ACTIVO` o `INACTIVO`. Nombre, vehículo y estado son obligatorios. Una solicitud inválida responde `400`; un UUID inexistente responde `404`.
+
 ### Envíos — `/api/envios`
 
-| Método | Ruta | Descripción |
+| Método | Ruta | Resultado principal |
 | --- | --- | --- |
-| `POST` | `/api/envios` | Crear envío; responde `201`. El código de seguimiento se genera en el servicio. |
-| `GET` | `/api/envios` | Listar envíos. |
-| `GET` | `/api/envios/{id}` | Consultar por UUID. |
-| `GET` | `/api/envios/seguimiento/{codigo}` | Consultar por código de seguimiento. |
-| `GET` | `/api/envios/estado/{estado}` | Filtrar por `PENDIENTE`, `EN_RUTA`, `ENTREGADO` o `CANCELADO`. |
-| `PUT` | `/api/envios/{envioId}/repartidor/{repartidorId}` | Asignar un repartidor activo a un envío pendiente; responde con el envío y el UUID del repartidor. |
-| `PUT` | `/api/envios/{id}` | Actualizar dimensiones y peso. |
-| `DELETE` | `/api/envios/{id}` | Eliminar físicamente; responde `204`. |
-| `POST` | `/api/envios/{id}/cancelacion` | Cancelar solo si el estado actual es `PENDIENTE`; responde con el envío actualizado. |
+| `POST` | `/api/envios` | Crea un envío en estado `PENDIENTE` y genera su código de seguimiento (`201`). |
+| `GET` | `/api/envios` | Lista envíos como DTOs (`200`). |
+| `GET` | `/api/envios/{id}` | Consulta por UUID (`200`, o `404` si no existe). |
+| `GET` | `/api/envios/seguimiento/{codigo}` | Consulta por código de seguimiento (`200`, o `404`). |
+| `GET` | `/api/envios/estado/{estado}` | Filtra por estado (`200`; `400` si el estado no es válido). |
+| `PUT` | `/api/envios/{id}` | Actualiza peso, dimensiones, direcciones y cliente (`200`). |
+| `DELETE` | `/api/envios/{id}` | Elimina físicamente el envío (`204`). |
+| `PUT` | `/api/envios/{envioId}/repartidor/{repartidorId}` | Asigna un repartidor (`200`). |
+| `POST` | `/api/envios/{id}/cancelacion` | Cancela un envío pendiente (`200`). |
+| `PATCH` | `/api/envios/{id}/estado` | Cambia el estado según el ciclo de vida (`200`). |
+| `GET` | `/api/envios/{id}/historial` | Consulta los cambios de estado de un envío (`200`). |
 
-Ejemplo del cuerpo de creación/actualización:
+Crear o actualizar envío:
 
 ```json
 {
   "peso": 2.5,
   "ancho": 10.0,
   "alto": 20.0,
-  "largo": 30.0
+  "largo": 30.0,
+  "origen": {
+    "calle": "San Martín",
+    "numero": "123",
+    "ciudad": "Córdoba",
+    "codigoPostal": "5000"
+  },
+  "destino": {
+    "calle": "Belgrano",
+    "numero": "456",
+    "ciudad": "Rosario",
+    "codigoPostal": "2000"
+  },
+  "clienteId": "2e0d43cc-4fa3-4dc8-9b0d-67f57bb3b001"
 }
 ```
 
-La regla de cancelación es `PENDIENTE → CANCELADO`. Si el envío no existe, se responde `404`. El servicio rechaza otros estados con `IllegalStateException`, pero el manejador global actual no define un caso específico para esa excepción: cae en su respuesta genérica `500`. Conviene agregar el mapeo de negocio que acuerde el equipo (por ejemplo, `409` o `422`) para que el rechazo tenga un código HTTP específico. La entidad también contiene direcciones de origen y destino, pero el DTO/controlador actual no las recibe; el flujo de alta puede requerir completar esa parte del contrato/modelo para persistir envíos con la configuración actual de la base.
+Las dimensiones y el peso deben ser mayores que cero. Origen, destino y un UUID de cliente existente son obligatorios. El código de seguimiento y el estado inicial se generan en el servicio.
 
-La asignación usa la relación muchos-a-uno `Envio → Repartidor`: un envío admite como máximo un repartidor y un repartidor puede estar vinculado a varios envíos. Solo se asignan envíos `PENDIENTE` y repartidores `ACTIVO`. Repetir la asignación al mismo repartidor es idempotente; intentar reemplazarlo por otro se rechaza con `409`.
+La respuesta de envío contiene `id`, `codigoSeguimiento`, dimensiones, `estado`, `clienteId`, `clienteNombre`, `origen`, `destino` y `repartidorId`. `repartidorId` es `null` hasta que se asigne un repartidor.
 
-### Repartidores — `/api/v1/repartidores`
+#### Asignar un repartidor
 
-| Método | Ruta | Descripción |
+Ejemplo: `PUT /api/envios/9b715c47-1a23-4b70-a146-fbf0ff47b001/repartidor/7f7a2b5b-51aa-4ce8-9c6e-345aaabf0d7b`. No requiere cuerpo. El envío debe estar `PENDIENTE`, el repartidor debe existir y estar `ACTIVO`, y un envío no puede cambiar a un repartidor distinto una vez asignado. La respuesta incluye el UUID del repartidor. Los IDs inexistentes responden `404`; las reglas incompatibles, `409`.
+
+#### Cambiar el estado
+
+`PATCH /api/envios/{id}/estado` recibe:
+
+```json
+{
+  "estado": "EN_RUTA"
+}
+```
+
+Transiciones admitidas:
+
+| Estado actual | Estado solicitado | Condición |
 | --- | --- | --- |
-| `POST` | `/api/v1/repartidores` | Registrar; responde `201`. |
-| `GET` | `/api/v1/repartidores` | Listar. |
-| `GET` | `/api/v1/repartidores/{id}` | Consultar por UUID. |
-| `PUT` | `/api/v1/repartidores/{id}` | Modificar. |
-| `DELETE` | `/api/v1/repartidores/{id}` | Eliminar; responde `204`. |
+| `PENDIENTE` | `EN_RUTA` | Debe haber un repartidor asignado. |
+| `PENDIENTE` | `CANCELADO` | No requiere repartidor. |
+| `EN_RUTA` | `ENTREGADO` | El envío debe estar en ruta. |
 
-El DTO de repartidor requiere `nombre`, `tipoVehiculo` y `estado` (`ACTIVO` o `INACTIVO`).
+Las demás transiciones responden `409`. El cambio se persiste y se agrega al historial. La operación `POST /api/envios/{id}/cancelacion` aplica la misma regla que `PENDIENTE → CANCELADO`.
+
+El historial individual devuelve los registros del envío ordenados del más reciente al más antiguo. Un envío recién creado todavía no tiene registros: se guarda cada transición posterior.
+
+### Historial global — `/api/historial`
+
+| Método | Ruta | Resultado principal |
+| --- | --- | --- |
+| `GET` | `/api/historial` | Lista los registros de historial de todos los envíos (`200`). |
 
 ## Errores
 
-`GlobalExceptionHandler`, anotado con `@RestControllerAdvice`, centraliza respuestas de error. Entre los casos contemplados están `404` para entidades no encontradas, `400` para errores de validación, `409` para conflictos de reglas de negocio y `500` para excepciones no controladas. La estructura estándar es `timestamp`, `status`, `error`, `message` y `path`; los errores de validación pueden incluir `validationErrors`.
+Las respuestas de error usan el formato `timestamp`, `status`, `error`, `message` y `path`. En errores de validación puede incluirse `validationErrors`.
+
+| Código HTTP | Significado habitual |
+| --- | --- |
+| `400` | Cuerpo inválido, validación fallida o valor de ruta que no se puede convertir. |
+| `404` | No existe el cliente, envío o repartidor solicitado. |
+| `409` | Conflicto con una regla de negocio o transición de estado. |
+| `500` | Error interno no contemplado. |
+
+## Ejecutar las pruebas
+
+Las pruebas usan una base H2 en memoria configurada en `src/test/resources/application.properties`, así que no requieren MySQL ni modifican la base local:
+
+```powershell
+.\mvnw.cmd test
+```
+
+La suite incluye pruebas unitarias de servicios, controladores y manejo de errores, pruebas de repositorio y persistencia, y una prueba de inicio del contexto Spring.
 
 ## Organización y decisiones técnicas
 
-- `controllers`: contrato HTTP y validación de entrada.
-- `services` / `services.impl`: operaciones y reglas del negocio.
+- `controllers`: endpoints HTTP y validación de solicitudes.
+- `services` / `services.impl`: reglas y operaciones del negocio.
 - `repositories`: persistencia con Spring Data JPA.
-- `models`: entidades JPA y objetos embebidos.
-- `dto`: modelos de entrada y salida para la API.
-- `enums`: estados del dominio.
-- `exceptions`: manejo centralizado de errores.
-- Los identificadores de entidades son UUID; `Auditable` aporta fechas de creación y última actualización.
-- El `pom.xml` fija Spring Boot `4.1.1` y Java `25`; la consigna del Sprint solicita Spring Boot `3.x`, por lo que la versión de Spring requiere confirmación del equipo docente/equipo antes de la entrega.
-- El estado inicial del envío es `PENDIENTE`. La cancelación está permitida únicamente antes de entrar en ruta.
-- Hibernate mantiene el esquema con `update`; para entornos compartidos o productivos se debe acordar una estrategia de migraciones antes de cambiarlo.
-
-## Alcance actual y siguientes pasos
-
-El repositorio no incluye actualmente `docker-compose.yml` ni Dockerfile. La ejecución documentada usa MySQL instalado o accesible localmente. La documentación interactiva OpenAPI/Swagger se publica desde la misma aplicación. El historial de cambios de estado sigue pendiente; la asignación de repartidores está disponible mediante `PUT /api/envios/{envioId}/repartidor/{repartidorId}`.
-
+- `models`: entidades; `Direccion` es un objeto embebido.
+- `dto`: contratos de entrada y salida de la API; las respuestas no exponen directamente la mayoría de las entidades.
+- `enums`: estados de envíos y repartidores.
+- `exceptions`: formato centralizado de respuestas de error.
+- Los IDs son UUID. El envío tiene un cliente obligatorio y hasta un repartidor; un repartidor puede asociarse a varios envíos.
+- Hibernate actualiza el esquema con `ddl-auto=update`; las migraciones no están configuradas.
+- La configuración actual de `pom.xml` usa Spring Boot `4.1.1` y Java `25`. La consigna del Sprint compartida anteriormente indica Spring Boot `3.x`; el equipo debería confirmar esa diferencia antes de la entrega.

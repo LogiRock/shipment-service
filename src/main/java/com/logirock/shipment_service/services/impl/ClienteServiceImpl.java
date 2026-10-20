@@ -51,7 +51,8 @@ public class ClienteServiceImpl implements ClienteService {
     public ClienteResponseDto modificarCliente(UUID id, ClienteRequestDto request) {
         Cliente cliente = buscarClientePorId(id);
 
-        // Validar si quiere cambiar el email y si el nuevo ya está en uso por otro usuario
+        // Validar si quiere cambiar el email y si el nuevo ya está en uso por otro
+        // usuario
         if (!cliente.getEmail().equals(request.getEmail()) && clienteRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("El nuevo email ya se encuentra registrado por otro cliente.");
         }
@@ -82,7 +83,12 @@ public class ClienteServiceImpl implements ClienteService {
                 cliente.getId(),
                 cliente.getNombre(),
                 cliente.getEmail(),
-                cliente.getTelefono()
-        );
+                cliente.getTelefono());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Cliente buscarEntidadPorId(UUID id) {
+        return buscarClientePorId(id);
     }
 }
