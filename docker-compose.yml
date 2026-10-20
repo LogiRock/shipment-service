@@ -1,0 +1,61 @@
+
+services:
+  mysql:
+    image: mysql:8.1
+    container_name: shipment-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE_NAME}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+
+    ports:
+      - "${DB_PORT:-3307}:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'mysqladmin ping -h 127.0.0.1 -u root -p"$${MYSQL_ROOT_PASSWORD}" --silent'
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+    networks:
+      - shipment-network
+
+  shipment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: shipment-service
+    restart: unless-stopped
+
+    environment:
+      DB_SUBPROTOCOL: ${DB_SUBPROTOCOL}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE_NAME: ${DB_DATABASE_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    networks:
+      - shipment-network
+
+volumes:
+  mysql_data:
+
+networks:
+  shipment-network:
+    driver: bridge
