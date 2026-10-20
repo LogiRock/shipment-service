@@ -1,5 +1,6 @@
 package com.logirock.shipment_service.services;
 
+import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
 import com.logirock.shipment_service.models.Envio;
 
@@ -21,4 +22,6 @@ public interface EnvioService {
     Envio actualizar(UUID id, Envio datos);
 
     void eliminar(UUID id);
+
+    EnvioResponseDto cancelarEnvio(UUID id);
 }
