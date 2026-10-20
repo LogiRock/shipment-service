@@ -3,9 +3,18 @@ package com.logirock.shipment_service.controllers;
 
 import com.logirock.shipment_service.dto.EnvioRequestDto;
 import com.logirock.shipment_service.dto.EnvioResponseDto;
+import com.logirock.shipment_service.dto.ErrorResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
 import com.logirock.shipment_service.models.Envio;
 import com.logirock.shipment_service.services.EnvioService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,12 +29,19 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/envios")
 @RequiredArgsConstructor
+@Tag(name = "Envíos", description = "Creación, seguimiento, consulta y cancelación de envíos")
 public class EnvioController {
 
     private final EnvioService envioService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Crear envío", description = "Registra un envío. El código de seguimiento se genera automáticamente.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Envío creado"),
+            @ApiResponse(responseCode = "400", description = "Peso o dimensiones inválidos", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
+            @ApiResponse(responseCode = "500", description = "No fue posible guardar el envío", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
     public EnvioResponseDto crear(
             @Valid @RequestBody EnvioRequestDto request) {
 
@@ -42,6 +58,8 @@ public class EnvioController {
     }
 
     @GetMapping
+    @Operation(summary = "Listar envíos")
+    @ApiResponse(responseCode = "200", description = "Listado de envíos")
     public List<EnvioResponseDto> listarTodos() {
         return envioService.listarTodos()
                 .stream()
@@ -50,20 +68,36 @@ public class EnvioController {
     }
 
     @GetMapping("/{id}")
-    public EnvioResponseDto buscarPorId(@PathVariable UUID id) {
+    @Operation(summary = "Consultar envío por UUID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Envío encontrado"),
+            @ApiResponse(responseCode = "404", description = "Envío inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
+    public EnvioResponseDto buscarPorId(@Parameter(description = "UUID del envío", required = true) @PathVariable UUID id) {
         return convertirAResponse(envioService.buscarPorId(id));
     }
 
     @GetMapping("/seguimiento/{codigo}")
+    @Operation(summary = "Consultar envío por código de seguimiento")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Envío encontrado"),
+            @ApiResponse(responseCode = "404", description = "No existe un envío con ese código", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
     public EnvioResponseDto buscarPorCodigoSeguimiento(
-            @PathVariable String codigo) {
+            @Parameter(description = "Código de seguimiento generado para el envío", example = "ENV-A1B2C3D4", required = true) @PathVariable String codigo) {
         return convertirAResponse(
                 envioService.buscarPorCodigoSeguimiento(codigo));
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Actualizar envío", description = "Actualiza el peso y las dimensiones de un envío.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Envío actualizado"),
+            @ApiResponse(responseCode = "400", description = "Peso o dimensiones inválidos", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
+            @ApiResponse(responseCode = "404", description = "Envío inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
     public EnvioResponseDto actualizar(
-            @PathVariable UUID id,
+            @Parameter(description = "UUID del envío", required = true) @PathVariable UUID id,
             @Valid @RequestBody EnvioRequestDto request) {
 
         Envio datos = new Envio();
@@ -77,7 +111,12 @@ public class EnvioController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void eliminar(@PathVariable UUID id) {
+    @Operation(summary = "Eliminar envío", description = "Elimina físicamente un envío.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Envío eliminado"),
+            @ApiResponse(responseCode = "404", description = "Envío inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
+    public void eliminar(@Parameter(description = "UUID del envío", required = true) @PathVariable UUID id) {
         envioService.eliminar(id);
     }
 
@@ -89,12 +128,18 @@ public class EnvioController {
                 envio.getAncho(),
                 envio.getAlto(),
                 envio.getLargo(),
-                envio.getEstado());
+                envio.getEstado(),
+                envio.getRepartidor() == null ? null : envio.getRepartidor().getId());
     }
 
     @GetMapping("/estado/{estado}")
+    @Operation(summary = "Filtrar envíos por estado", description = "Estados permitidos: PENDIENTE, EN_RUTA, ENTREGADO y CANCELADO.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Envíos del estado solicitado"),
+            @ApiResponse(responseCode = "500", description = "Estado no reconocido", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
     public List<EnvioResponseDto> buscarPorEstado(
-            @PathVariable EstadoEnvio estado) {
+            @Parameter(description = "Estado del envío", example = "PENDIENTE", required = true) @PathVariable EstadoEnvio estado) {
 
         return envioService.findByEstado(estado)
                 .stream()
@@ -102,8 +147,30 @@ public class EnvioController {
                 .toList();
     }
     @PostMapping("/{id}/cancelacion")
-    public ResponseEntity<EnvioResponseDto> cancelarEnvio(@PathVariable UUID id) {
+    @Operation(summary = "Cancelar envío", description = "Cancela un envío únicamente si su estado actual es PENDIENTE.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Envío cancelado; el estado de respuesta es CANCELADO"),
+            @ApiResponse(responseCode = "404", description = "Envío inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
+            @ApiResponse(responseCode = "500", description = "El estado actual no permite cancelar el envío; actualmente se devuelve el error genérico", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
+    public ResponseEntity<EnvioResponseDto> cancelarEnvio(@Parameter(description = "UUID del envío", required = true) @PathVariable UUID id) {
         return ResponseEntity.ok(envioService.cancelarEnvio(id));
+    }
+
+    @PutMapping("/{envioId}/repartidor/{repartidorId}")
+    @Operation(summary = "Asignar repartidor", description = "Asigna un repartidor ACTIVO a un envío PENDIENTE. Cada envío admite uno y un repartidor puede tener varios envíos.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Repartidor asignado", content = @Content(
+                    schema = @Schema(implementation = EnvioResponseDto.class),
+                    examples = @ExampleObject(value = "{\"id\":\"9b715c47-1a23-4b70-a146-fbf0ff47b001\",\"codigoSeguimiento\":\"ENV-A1B2C3D4\",\"peso\":2.5,\"ancho\":10.0,\"alto\":20.0,\"largo\":30.0,\"estado\":\"PENDIENTE\",\"repartidorId\":\"7f7a2b5b-51aa-4ce8-9c6e-345aaabf0d7b\"}"))),
+            @ApiResponse(responseCode = "404", description = "Envío o repartidor inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
+            @ApiResponse(responseCode = "409", description = "El repartidor está inactivo, el envío no está pendiente o ya tiene otro repartidor", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
+    public ResponseEntity<EnvioResponseDto> asignarRepartidor(
+            @Parameter(description = "UUID del envío", required = true) @PathVariable UUID envioId,
+            @Parameter(description = "UUID del repartidor activo", required = true) @PathVariable UUID repartidorId) {
+        Envio envio = envioService.asignarRepartidor(envioId, repartidorId);
+        return ResponseEntity.ok(convertirAResponse(envio));
     }
 
 }

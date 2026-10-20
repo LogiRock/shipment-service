@@ -2,8 +2,11 @@ package com.logirock.shipment_service.services.impl;
 
 import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
+import com.logirock.shipment_service.enums.EstadoRepartidor;
 import com.logirock.shipment_service.models.Envio;
+import com.logirock.shipment_service.models.Repartidor;
 import com.logirock.shipment_service.repositories.EnvioRepository;
+import com.logirock.shipment_service.repositories.RepartidorRepository;
 import com.logirock.shipment_service.services.EnvioService;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -23,6 +26,7 @@ import static org.springframework.http.HttpStatus.*;
 public class EnvioServiceImpl implements EnvioService {
 
     private final EnvioRepository envioRepository;
+    private final RepartidorRepository repartidorRepository;
 
     @Override
     public Envio crear(Envio envio) {
@@ -101,6 +105,31 @@ public class EnvioServiceImpl implements EnvioService {
         Envio envioCancelado = envioRepository.save(envio);
         return mapearAResponseDto(envioCancelado);
     }
+
+    @Override
+    public Envio asignarRepartidor(UUID envioId, UUID repartidorId) {
+        Envio envio = envioRepository.findById(envioId)
+                .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún envío con el ID: " + envioId));
+
+        Repartidor repartidor = repartidorRepository.findById(repartidorId)
+                .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún repartidor con el ID: " + repartidorId));
+
+        if (repartidor.getEstado() != EstadoRepartidor.ACTIVO) {
+            throw new IllegalArgumentException("No se puede asignar un repartidor INACTIVO.");
+        }
+
+        if (envio.getEstado() != EstadoEnvio.PENDIENTE) {
+            throw new IllegalArgumentException("Solo se puede asignar un repartidor a un envío PENDIENTE.");
+        }
+
+        if (envio.getRepartidor() != null && !envio.getRepartidor().getId().equals(repartidorId)) {
+            throw new IllegalArgumentException("El envío ya tiene asignado otro repartidor.");
+        }
+
+        envio.setRepartidor(repartidor);
+        return envioRepository.save(envio);
+    }
+
     private EnvioResponseDto mapearAResponseDto(Envio envio) {
         return new EnvioResponseDto(
                 envio.getId(),
@@ -109,6 +138,7 @@ public class EnvioServiceImpl implements EnvioService {
                 envio.getAncho(),
                 envio.getAlto(),
                 envio.getLargo(),
-                envio.getEstado());
+                envio.getEstado(),
+                envio.getRepartidor() == null ? null : envio.getRepartidor().getId());
     }
 }

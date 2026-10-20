@@ -24,4 +24,6 @@ public interface EnvioService {
     void eliminar(UUID id);
 
     EnvioResponseDto cancelarEnvio(UUID id);
+
+    Envio asignarRepartidor(UUID envioId, UUID repartidorId);
 }
