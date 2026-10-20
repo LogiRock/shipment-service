@@ -3,6 +3,8 @@ package com.logirock.shipment_service.controllers;
 
 import com.logirock.shipment_service.dto.EnvioRequestDto;
 import com.logirock.shipment_service.dto.EnvioResponseDto;
+import com.logirock.shipment_service.dto.EstadoEnvioRequestDto;
+import com.logirock.shipment_service.dto.HistorialEstadoEnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
 import com.logirock.shipment_service.models.Envio;
 import com.logirock.shipment_service.services.EnvioService;
@@ -101,14 +103,33 @@ public class EnvioController {
                 .map(this::convertirAResponse)
                 .toList();
     }
+
     @PostMapping("/{id}/cancelacion")
     public ResponseEntity<EnvioResponseDto> cancelarEnvio(@PathVariable UUID id) {
         return ResponseEntity.ok(envioService.cancelarEnvio(id));
     }
 
-    @PatchMapping("/{id}/cancelar")
-    public EnvioResponseDto cancelar(@PathVariable UUID id) {
-        return convertirAResponse(envioService.cancelar(id));
+    @PatchMapping("/{id}/estado")
+    public EnvioResponseDto cambiarEstado(
+            @PathVariable UUID id,
+            @Valid @RequestBody EstadoEnvioRequestDto request) {
+
+        return convertirAResponse(
+                envioService.cambiarEstado(id, request.getEstado()));
+    }
+
+    @GetMapping("/{id}/historial")
+    public List<HistorialEstadoEnvioResponseDto> consultarHistorial(
+            @PathVariable UUID id) {
+
+        return envioService.consultarHistorial(id)
+                .stream()
+                .map(historial -> new HistorialEstadoEnvioResponseDto(
+                        historial.getId(),
+                        historial.getEstadoAnterior(),
+                        historial.getEstadoNuevo(),
+                        historial.getFechaCambio()))
+                .toList();
     }
 
 }

@@ -3,7 +3,9 @@ package com.logirock.shipment_service.services.impl;
 import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
 import com.logirock.shipment_service.models.Envio;
+import com.logirock.shipment_service.models.HistorialEstadoEnvio;
 import com.logirock.shipment_service.repositories.EnvioRepository;
+import com.logirock.shipment_service.repositories.HistorialEstadoEnvioRepository;
 import com.logirock.shipment_service.services.EnvioService;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -23,6 +25,7 @@ import static org.springframework.http.HttpStatus.*;
 public class EnvioServiceImpl implements EnvioService {
 
     private final EnvioRepository envioRepository;
+    private final HistorialEstadoEnvioRepository historialRepository;
 
     @Override
     public Envio crear(Envio envio) {
@@ -87,22 +90,6 @@ public class EnvioServiceImpl implements EnvioService {
         return envioRepository.findByEstado(estado);
     }
 
-    @Override
-    public Envio cancelar(UUID id) {
-        // TODO Auto-generated method stub
-        Envio envio = buscarPorId(id);
-
-        if (envio.getEstado() != EstadoEnvio.PENDIENTE) {
-            throw new ResponseStatusException(
-                    CONFLICT,
-                    "Solo se pueden cancelar envíos en estado PENDIENTE");
-        }
-
-        envio.setEstado(EstadoEnvio.CANCELADO);
-
-        return envioRepository.save(envio);
-    }
-
     @Transactional
     public EnvioResponseDto cancelarEnvio(UUID id) {
         Envio envio = envioRepository.findById(id)
@@ -127,4 +114,50 @@ public class EnvioServiceImpl implements EnvioService {
                 envio.getLargo(),
                 envio.getEstado());
     }
+
+    @Override
+    public Envio cambiarEstado(UUID id, EstadoEnvio nuevoEstado) {
+        Envio envio = buscarPorId(id);
+
+        if (nuevoEstado == null) {
+            throw new ResponseStatusException(
+                    BAD_REQUEST, "El nuevo estado es obligatorio");
+        }
+
+        EstadoEnvio estadoActual = envio.getEstado();
+
+        boolean transicionPermitida = (estadoActual == EstadoEnvio.PENDIENTE
+                && (nuevoEstado == EstadoEnvio.EN_RUTA
+                        || nuevoEstado == EstadoEnvio.CANCELADO))
+                || (estadoActual == EstadoEnvio.EN_RUTA
+                        && nuevoEstado == EstadoEnvio.ENTREGADO);
+
+        if (!transicionPermitida) {
+            throw new ResponseStatusException(
+                    CONFLICT,
+                    "Transición de estado no permitida: "
+                            + estadoActual + " -> " + nuevoEstado);
+        }
+
+        HistorialEstadoEnvio historial = new HistorialEstadoEnvio();
+        historial.setEnvio(envio);
+        historial.setEstadoAnterior(estadoActual);
+        historial.setEstadoNuevo(nuevoEstado);
+
+        historialRepository.save(historial);
+
+        envio.setEstado(nuevoEstado);
+
+        return envioRepository.save(envio);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HistorialEstadoEnvio> consultarHistorial(UUID envioId) {
+        buscarPorId(envioId);
+
+        return historialRepository
+                .findByEnvio_IdOrderByFechaCambioDesc(envioId);
+    }
+
 }
