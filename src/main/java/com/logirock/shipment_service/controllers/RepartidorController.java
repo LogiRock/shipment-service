@@ -16,7 +16,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.logirock.shipment_service.dto.RepartidorRequestDto;
 import com.logirock.shipment_service.dto.RepartidorResponseDto;
+import com.logirock.shipment_service.dto.ErrorResponseDto;
 import com.logirock.shipment_service.services.RepartidorService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +35,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/v1/repartidores")
 @RequiredArgsConstructor
+@Tag(name = "Repartidores", description = "Registro, consulta, actualización y eliminación de repartidores")
 public class RepartidorController {
 
     /**
@@ -38,6 +47,11 @@ public class RepartidorController {
      * Endpoint para dar de alta un nuevo repartidor.
      */
     @PostMapping
+    @Operation(summary = "Registrar repartidor")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Repartidor registrado"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
     public ResponseEntity<RepartidorResponseDto> registrarRepartidor(@Valid @RequestBody RepartidorRequestDto request) {
         RepartidorResponseDto response = repartidorService.registrarRepartidor(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -47,7 +61,13 @@ public class RepartidorController {
      * Endpoint para consultar un repartidor por su identificador.
      */
     @GetMapping("/{id}")
-    public ResponseEntity<RepartidorResponseDto> obtenerRepartidor(@PathVariable UUID id) {
+    @Operation(summary = "Consultar repartidor por UUID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Repartidor encontrado"),
+            @ApiResponse(responseCode = "404", description = "Repartidor inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
+    public ResponseEntity<RepartidorResponseDto> obtenerRepartidor(
+            @Parameter(description = "UUID del repartidor", required = true) @PathVariable UUID id) {
         RepartidorResponseDto response = repartidorService.obtenerRepartidor(id);
         return ResponseEntity.ok(response);
     }
@@ -56,6 +76,8 @@ public class RepartidorController {
      * Endpoint para consultar todos los repartidores registrados.
      */
     @GetMapping
+    @Operation(summary = "Listar repartidores")
+    @ApiResponse(responseCode = "200", description = "Listado de repartidores")
     public ResponseEntity<List<RepartidorResponseDto>> listarRepartidores() {
         List<RepartidorResponseDto> response = repartidorService.listarRepartidores();
         return ResponseEntity.ok(response);
@@ -65,8 +87,14 @@ public class RepartidorController {
      * Endpoint para actualizar la información de un repartidor existente.
      */
     @PutMapping("/{id}")
+    @Operation(summary = "Modificar repartidor")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Repartidor actualizado"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
+            @ApiResponse(responseCode = "404", description = "Repartidor inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
     public ResponseEntity<RepartidorResponseDto> modificarRepartidor(
-            @PathVariable UUID id,
+            @Parameter(description = "UUID del repartidor", required = true) @PathVariable UUID id,
             @Valid @RequestBody RepartidorRequestDto request) {
         RepartidorResponseDto response = repartidorService.modificarRepartidor(id, request);
         return ResponseEntity.ok(response);
@@ -76,7 +104,13 @@ public class RepartidorController {
      * Endpoint para eliminar físicamente un repartidor del sistema.
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminarRepartidor(@PathVariable UUID id) {
+    @Operation(summary = "Eliminar repartidor")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Repartidor eliminado"),
+            @ApiResponse(responseCode = "404", description = "Repartidor inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+    })
+    public ResponseEntity<Void> eliminarRepartidor(
+            @Parameter(description = "UUID del repartidor", required = true) @PathVariable UUID id) {
         repartidorService.eliminarRepartidor(id);
         return ResponseEntity.noContent().build();
     }

@@ -2,7 +2,6 @@ package com.logirock.shipment_service.services.impl;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
@@ -21,6 +20,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.logirock.shipment_service.enums.EstadoEnvio;
+import com.logirock.shipment_service.enums.EstadoRepartidor;
+import com.logirock.shipment_service.models.Envio;
+import com.logirock.shipment_service.models.Repartidor;
+import com.logirock.shipment_service.repositories.EnvioRepository;
+import com.logirock.shipment_service.repositories.RepartidorRepository;
+
 import com.logirock.shipment_service.models.Cliente;
 import com.logirock.shipment_service.models.Envio;
 import com.logirock.shipment_service.models.HistorialEstadoEnvio;
@@ -36,6 +41,9 @@ class EnvioServiceImplTest {
     @Mock
     private ClienteService clienteService;
 
+    @Mock
+    private RepartidorRepository repartidorRepository;
+
     @InjectMocks
     private EnvioServiceImpl envioService;
     @Mock
@@ -48,6 +56,7 @@ class EnvioServiceImplTest {
     void setUp() {
         envio = new Envio();
         envio.setId(UUID.randomUUID());
+        id = envio.getId();
         envio.setCodigoSeguimiento("ENV-ABC12345");
         envio.setPeso(5.5);
         envio.setAncho(30.0);
@@ -206,7 +215,10 @@ class EnvioServiceImplTest {
     void cancelarEnvioLanzaExcepcionCuandoNoExiste() {
         when(envioRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertThrows(EntityNotFoundException.class, () -> envioService.cancelarEnvio(id));
+        ResponseStatusException excepcion = assertThrows(
+                ResponseStatusException.class,
+                () -> envioService.cancelarEnvio(id));
+        assertEquals(HttpStatus.NOT_FOUND, excepcion.getStatusCode());
         verify(envioRepository, never()).save(envio);
     }
 
@@ -215,13 +227,29 @@ class EnvioServiceImplTest {
         envio.setEstado(EstadoEnvio.EN_RUTA);
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
 
-        assertThrows(IllegalStateException.class, () -> envioService.cancelarEnvio(id));
+        ResponseStatusException excepcion = assertThrows(
+                ResponseStatusException.class,
+                () -> envioService.cancelarEnvio(id));
+        assertEquals(HttpStatus.CONFLICT, excepcion.getStatusCode());
         verify(envioRepository, never()).save(envio);
     }
 
     @Test
-    void cambiarEstadoDePendienteAEnRutaEsPermitido() {
+    void asignarRepartidorDebePersistirLaAsignacion_CuandoEnvioEstaPendienteYRepartidorActivo() {
+        Repartidor repartidor = repartidorActivo();
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(repartidorRepository.findById(repartidor.getId())).thenReturn(Optional.of(repartidor));
+        when(envioRepository.save(envio)).thenReturn(envio);
+
+        Envio response = envioService.asignarRepartidor(id, repartidor.getId());
+
+        assertEquals(repartidor.getId(), response.getRepartidor().getId());
+    }
+
+    @Test
+    void cambiarEstadoDePendienteAEnRutaEsPermitidoCuandoTieneRepartidorAsignado() {
         envio.setEstado(EstadoEnvio.PENDIENTE);
+        envio.setRepartidor(repartidorActivo());
 
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
         when(envioRepository.save(envio)).thenReturn(envio);
@@ -233,6 +261,82 @@ class EnvioServiceImplTest {
         verify(envioRepository).save(envio);
     }
 
+    @Test
+    void cambiarEstadoDePendienteAEnRutaSeRechazaCuandoNoTieneRepartidorAsignado() {
+        envio.setEstado(EstadoEnvio.PENDIENTE);
+
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+
+        ResponseStatusException excepcion = assertThrows(
+                ResponseStatusException.class,
+                () -> envioService.cambiarEstado(id, EstadoEnvio.EN_RUTA));
+
+        assertEquals(HttpStatus.CONFLICT, excepcion.getStatusCode());
+        verify(envioRepository, never()).save(any(Envio.class));
+        verify(historialRepository, never()).save(any(HistorialEstadoEnvio.class));
+    }
+
+    @Test
+    void asignarRepartidorDebeRechazarEnvioInexistente() {
+        UUID repartidorId = UUID.randomUUID();
+        when(envioRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> envioService.asignarRepartidor(id, repartidorId));
+        verify(envioRepository, never()).save(any(Envio.class));
+    }
+
+    @Test
+    void asignarRepartidorDebeRechazarRepartidorInexistente() {
+        UUID repartidorId = UUID.randomUUID();
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(repartidorRepository.findById(repartidorId)).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> envioService.asignarRepartidor(id, repartidorId));
+        verify(envioRepository, never()).save(any(Envio.class));
+    }
+
+    @Test
+    void asignarRepartidorDebeRechazarRepartidorInactivo() {
+        Repartidor repartidor = repartidorActivo();
+        repartidor.setEstado(EstadoRepartidor.INACTIVO);
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(repartidorRepository.findById(repartidor.getId())).thenReturn(Optional.of(repartidor));
+
+        assertThrows(IllegalArgumentException.class, () -> envioService.asignarRepartidor(id, repartidor.getId()));
+        verify(envioRepository, never()).save(any(Envio.class));
+    }
+
+    @Test
+    void asignarRepartidorDebeRechazarEnvioQueYaTieneOtroRepartidor() {
+        Repartidor actual = repartidorActivo();
+        Repartidor nuevo = repartidorActivo();
+        envio.setRepartidor(actual);
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(repartidorRepository.findById(nuevo.getId())).thenReturn(Optional.of(nuevo));
+
+        assertThrows(IllegalArgumentException.class, () -> envioService.asignarRepartidor(id, nuevo.getId()));
+        verify(envioRepository, never()).save(any(Envio.class));
+    }
+
+    @Test
+    void asignarRepartidorDebeRechazarEnvioQueYaNoEstaPendiente() {
+        Repartidor repartidor = repartidorActivo();
+        envio.setEstado(EstadoEnvio.EN_RUTA);
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(repartidorRepository.findById(repartidor.getId())).thenReturn(Optional.of(repartidor));
+
+        assertThrows(IllegalArgumentException.class, () -> envioService.asignarRepartidor(id, repartidor.getId()));
+        verify(envioRepository, never()).save(any(Envio.class));
+    }
+
+    private Repartidor repartidorActivo() {
+        Repartidor repartidor = new Repartidor();
+        repartidor.setId(UUID.randomUUID());
+        repartidor.setNombre("Juan Pérez");
+        repartidor.setTipoVehiculo("Motocicleta");
+        repartidor.setEstado(EstadoRepartidor.ACTIVO);
+        return repartidor;
+    }
     @Test
     void cambiarEstadoDePendienteACanceladoEsPermitido() {
         envio.setEstado(EstadoEnvio.PENDIENTE);

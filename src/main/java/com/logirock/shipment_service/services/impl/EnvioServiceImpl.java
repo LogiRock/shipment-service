@@ -1,15 +1,17 @@
 package com.logirock.shipment_service.services.impl;
 
-import com.logirock.shipment_service.dto.ClienteResponseDto;
 import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
-import com.logirock.shipment_service.models.Cliente;
+import com.logirock.shipment_service.enums.EstadoRepartidor;
 import com.logirock.shipment_service.models.Envio;
-import com.logirock.shipment_service.models.HistorialEstadoEnvio;
-import com.logirock.shipment_service.repositories.ClienteRepository;
+import com.logirock.shipment_service.models.Repartidor;
 import com.logirock.shipment_service.repositories.EnvioRepository;
+import com.logirock.shipment_service.repositories.RepartidorRepository;
+import com.logirock.shipment_service.models.Cliente;
+import com.logirock.shipment_service.models.HistorialEstadoEnvio;
 import com.logirock.shipment_service.repositories.HistorialEstadoEnvioRepository;
 import com.logirock.shipment_service.services.ClienteService;
+
 import com.logirock.shipment_service.services.EnvioService;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -33,6 +35,8 @@ public class EnvioServiceImpl implements EnvioService {
     private final EnvioRepository envioRepository;
     private final HistorialEstadoEnvioRepository historialRepository;
     private final ClienteService clienteService;
+
+    private final RepartidorRepository repartidorRepository;
 
     @Override
     public Envio crear(Envio envio, UUID clienteId) {
@@ -103,24 +107,36 @@ public class EnvioServiceImpl implements EnvioService {
     @Override
     @Transactional(readOnly = true)
     public List<Envio> findByEstado(EstadoEnvio estado) {
-        // TODO Auto-generated method stub
         return envioRepository.findByEstado(estado);
     }
 
-    @Transactional
+    @Override
     public EnvioResponseDto cancelarEnvio(UUID id) {
-        Envio envio = envioRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún envío con el ID: " + id));
+        return mapearAResponseDto(cambiarEstado(id, EstadoEnvio.CANCELADO));
+    }
 
-        if (envio.getEstado() != EstadoEnvio.PENDIENTE) {
-            throw new IllegalStateException("Solo se pueden cancelar envíos en estado PENDIENTE.");
+    @Override
+    public Envio asignarRepartidor(UUID envioId, UUID repartidorId) {
+        Envio envio = envioRepository.findById(envioId)
+                .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún envío con el ID: " + envioId));
+
+        Repartidor repartidor = repartidorRepository.findById(repartidorId)
+                .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún repartidor con el ID: " + repartidorId));
+
+        if (repartidor.getEstado() != EstadoRepartidor.ACTIVO) {
+            throw new IllegalArgumentException("No se puede asignar un repartidor INACTIVO.");
         }
 
-        registrarCambioEstado(envio, EstadoEnvio.CANCELADO);
+        if (envio.getEstado() != EstadoEnvio.PENDIENTE) {
+            throw new IllegalArgumentException("Solo se puede asignar un repartidor a un envío PENDIENTE.");
+        }
 
-        envio.setEstado(EstadoEnvio.CANCELADO);
-        Envio envioCancelado = envioRepository.save(envio);
-        return mapearAResponseDto(envioCancelado);
+        if (envio.getRepartidor() != null && !envio.getRepartidor().getId().equals(repartidorId)) {
+            throw new IllegalArgumentException("El envío ya tiene asignado otro repartidor.");
+        }
+
+        envio.setRepartidor(repartidor);
+        return envioRepository.save(envio);
     }
 
     private EnvioResponseDto mapearAResponseDto(Envio envio) {
@@ -132,12 +148,13 @@ public class EnvioServiceImpl implements EnvioService {
                 envio.getAlto(),
                 envio.getLargo(),
                 envio.getEstado(),
+                envio.getRepartidor() == null ? null : envio.getRepartidor().getId(),
+
                 envio.getCliente().getId(),
                 envio.getCliente().getNombre(),
                 envio.getOrigen(),
                 envio.getDestino());
     }
-
     @Override
     public Envio cambiarEstado(UUID id, EstadoEnvio nuevoEstado) {
         Envio envio = buscarPorId(id);
@@ -150,21 +167,22 @@ public class EnvioServiceImpl implements EnvioService {
         EstadoEnvio estadoActual = envio.getEstado();
 
         boolean transicionPermitida = (estadoActual == EstadoEnvio.PENDIENTE
-                && (nuevoEstado == EstadoEnvio.EN_RUTA
-                        || nuevoEstado == EstadoEnvio.CANCELADO))
+                && (nuevoEstado == EstadoEnvio.CANCELADO
+                        || (nuevoEstado == EstadoEnvio.EN_RUTA && envio.getRepartidor() != null)))
                 || (estadoActual == EstadoEnvio.EN_RUTA
                         && nuevoEstado == EstadoEnvio.ENTREGADO);
 
         if (!transicionPermitida) {
             throw new ResponseStatusException(
                     CONFLICT,
-                    "Transición de estado no permitida: "
-                            + estadoActual + " -> " + nuevoEstado);
+                    estadoActual == EstadoEnvio.PENDIENTE
+                            && nuevoEstado == EstadoEnvio.EN_RUTA
+                            && envio.getRepartidor() == null
+                                    ? "No se puede poner el envío EN_RUTA sin asignarle un repartidor."
+                                    : "Transición de estado no permitida: " + estadoActual + " -> " + nuevoEstado);
         }
 
         registrarCambioEstado(envio, nuevoEstado);
-
-        envio.setEstado(nuevoEstado);
 
         return envioRepository.save(envio);
     }

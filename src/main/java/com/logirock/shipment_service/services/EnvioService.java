@@ -26,8 +26,8 @@ public interface EnvioService {
 
     EnvioResponseDto cancelarEnvio(UUID id);
 
+    Envio asignarRepartidor(UUID envioId, UUID repartidorId);
     Envio cambiarEstado(UUID id, EstadoEnvio nuevoEstado);
 
     List<HistorialEstadoEnvio> consultarHistorial(UUID envioId);
-
 }

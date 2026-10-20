@@ -92,15 +92,17 @@ public class Envio extends Auditable{
     })
     private Direccion destino;
 
+
+    /** Repartidor asignado; cada envío puede tener como máximo uno. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "repartidor_id")
+    private Repartidor repartidor;
+
     @NotNull(message = "El cliente es obligatorio")
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "cliente_id", nullable = false)
     private Cliente cliente;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "repartidor_id")
-    private Repartidor repartidor;
-    
     @PrePersist
     private void inicializarEstado() {
         if (estado == null) {
