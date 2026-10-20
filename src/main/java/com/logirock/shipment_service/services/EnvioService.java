@@ -10,9 +10,9 @@ import java.util.UUID;
 
 public interface EnvioService {
 
-    Envio crear(Envio envio);
+    Envio crear(Envio envio, UUID clienteId);
 
-    List<Envio> listarTodos();
+    List<EnvioResponseDto> listarTodos();
 
     List<Envio> findByEstado(EstadoEnvio estado);
 

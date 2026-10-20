@@ -11,4 +11,5 @@ public interface HistorialEstadoEnvioRepository
         extends JpaRepository<HistorialEstadoEnvio, UUID> {
 
     List<HistorialEstadoEnvio> findByEnvio_IdOrderByFechaCambioDesc(UUID envioId);
+    
 }

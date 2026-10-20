@@ -1,5 +1,10 @@
 package com.logirock.shipment_service.dto;
 
+import java.util.UUID;
+
+import com.logirock.shipment_service.models.Direccion;
+
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -9,11 +14,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Builder 
-@Getter 
-@Setter 
-@NoArgsConstructor 
-@AllArgsConstructor 
+@Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class EnvioRequestDto {
 
     @NotNull(message = "El peso es obligatorio")
@@ -31,5 +36,16 @@ public class EnvioRequestDto {
     @NotNull(message = "El largo es obligatorio")
     @Positive(message = "El largo debe ser mayor que cero")
     private Double largo;
+
+    @Valid
+    @NotNull(message = "La dirección de origen es obligatoria")
+    private Direccion origen;
+
+    @Valid
+    @NotNull(message = "La dirección de destino es obligatoria")
+    private Direccion destino;
+
+    @NotNull(message = "El cliente es obligatorio")
+    private UUID clienteId;
 
 }

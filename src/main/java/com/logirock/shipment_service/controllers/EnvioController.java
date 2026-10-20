@@ -6,6 +6,7 @@ import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.dto.EstadoEnvioRequestDto;
 import com.logirock.shipment_service.dto.HistorialEstadoEnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
+import com.logirock.shipment_service.models.Cliente;
 import com.logirock.shipment_service.models.Envio;
 import com.logirock.shipment_service.services.EnvioService;
 
@@ -37,18 +38,18 @@ public class EnvioController {
         envio.setAncho(request.getAncho());
         envio.setAlto(request.getAlto());
         envio.setLargo(request.getLargo());
+        envio.setOrigen(request.getOrigen());
+        envio.setDestino(request.getDestino());
 
-        Envio creado = envioService.crear(envio);
+        Envio creado = envioService.crear(envio, request.getClienteId());
+
 
         return convertirAResponse(creado);
     }
 
     @GetMapping
     public List<EnvioResponseDto> listarTodos() {
-        return envioService.listarTodos()
-                .stream()
-                .map(this::convertirAResponse)
-                .toList();
+        return envioService.listarTodos();
     }
 
     @GetMapping("/{id}")
@@ -69,10 +70,17 @@ public class EnvioController {
             @Valid @RequestBody EnvioRequestDto request) {
 
         Envio datos = new Envio();
+
+        Cliente cliente = new Cliente();
+        cliente.setId(request.getClienteId());
+        datos.setCliente(cliente);
+
         datos.setPeso(request.getPeso());
         datos.setAncho(request.getAncho());
         datos.setAlto(request.getAlto());
         datos.setLargo(request.getLargo());
+        datos.setOrigen(request.getOrigen());
+        datos.setDestino(request.getDestino());
 
         return convertirAResponse(envioService.actualizar(id, datos));
     }
@@ -91,7 +99,12 @@ public class EnvioController {
                 envio.getAncho(),
                 envio.getAlto(),
                 envio.getLargo(),
-                envio.getEstado());
+                envio.getEstado(),
+                envio.getCliente().getId(),
+                envio.getCliente().getNombre(),
+                envio.getOrigen(),
+                envio.getDestino()
+            );
     }
 
     @GetMapping("/estado/{estado}")
