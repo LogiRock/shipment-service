@@ -17,20 +17,29 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.logirock.shipment_service.enums.EstadoEnvio;
+import com.logirock.shipment_service.models.Cliente;
 import com.logirock.shipment_service.models.Envio;
+import com.logirock.shipment_service.models.HistorialEstadoEnvio;
 import com.logirock.shipment_service.repositories.EnvioRepository;
+import com.logirock.shipment_service.repositories.HistorialEstadoEnvioRepository;
+import com.logirock.shipment_service.services.ClienteService;
 
 @ExtendWith(MockitoExtension.class)
 class EnvioServiceImplTest {
 
     @Mock
     private EnvioRepository envioRepository;
+    @Mock
+    private ClienteService clienteService;
 
     @InjectMocks
     private EnvioServiceImpl envioService;
+    @Mock
+    private HistorialEstadoEnvioRepository historialRepository;
 
     private UUID id;
     private Envio envio;
@@ -45,23 +54,37 @@ class EnvioServiceImplTest {
         envio.setAlto(20.0);
         envio.setLargo(40.0);
         envio.setEstado(EstadoEnvio.PENDIENTE);
+        Cliente cliente = new Cliente();
+        cliente.setId(UUID.randomUUID());
+        cliente.setNombre("Cliente de prueba");
+
+        envio.setCliente(cliente);
     }
 
     @Test
     void crearEnvioDebeRetornarEnvio_CuandoDatosSonValidos() {
-        when(envioRepository.existsByCodigoSeguimiento(anyString()))
-                .thenReturn(false);
+        UUID clienteId = UUID.randomUUID();
+
+        Cliente cliente = new Cliente();
+        cliente.setId(clienteId);
+        cliente.setNombre("Cliente de prueba");
+
+        when(clienteService.buscarEntidadPorId(clienteId))
+                .thenReturn(cliente);
 
         when(envioRepository.save(any(Envio.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        Envio response = envioService.crear(envio);
+        Envio response = envioService.crear(envio, clienteId);
 
         assertNotNull(response);
         assertNotNull(response.getCodigoSeguimiento());
         assertTrue(response.getCodigoSeguimiento().startsWith("ENV-"));
+        assertEquals(EstadoEnvio.PENDIENTE, response.getEstado());
+        assertEquals(clienteId, response.getCliente().getId());
 
-        verify(envioRepository, times(1)).save(any(Envio.class));
+        verify(envioRepository).save(any(Envio.class));
+        verify(clienteService).buscarEntidadPorId(clienteId);
     }
 
     @Test
@@ -133,13 +156,14 @@ class EnvioServiceImplTest {
     void listarEnviosDebeRetornarLista_CuandoHayEnvios() {
         when(envioRepository.findAll()).thenReturn(List.of(envio));
 
-        List<Envio> response = envioService.listarTodos();
+        List<EnvioResponseDto> response = envioService.listarTodos();
 
         assertNotNull(response);
         assertEquals(1, response.size());
         assertEquals(envio.getId(), response.get(0).getId());
+        assertEquals("Cliente de prueba", response.get(0).getClienteNombre());
 
-        verify(envioRepository, times(1)).findAll();
+        verify(envioRepository).findAll();
     }
 
     @Test
@@ -160,14 +184,22 @@ class EnvioServiceImplTest {
 
     @Test
     void cancelarEnvioActualizaEstadoYRetornaEnvioCancelado() {
-        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
-        when(envioRepository.save(envio)).thenReturn(envio);
+        UUID id = UUID.randomUUID();
+        envio.setId(id);
+        envio.setEstado(EstadoEnvio.PENDIENTE);
+
+        when(envioRepository.findById(id))
+                .thenReturn(Optional.of(envio));
+        when(envioRepository.save(envio))
+                .thenReturn(envio);
 
         EnvioResponseDto response = envioService.cancelarEnvio(id);
 
         assertEquals(EstadoEnvio.CANCELADO, response.getEstado());
         assertEquals(id, response.getId());
+
         verify(envioRepository).save(envio);
+        verify(historialRepository).save(any(HistorialEstadoEnvio.class));
     }
 
     @Test
@@ -185,6 +217,91 @@ class EnvioServiceImplTest {
 
         assertThrows(IllegalStateException.class, () -> envioService.cancelarEnvio(id));
         verify(envioRepository, never()).save(envio);
+    }
+
+    @Test
+    void cambiarEstadoDePendienteAEnRutaEsPermitido() {
+        envio.setEstado(EstadoEnvio.PENDIENTE);
+
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(envioRepository.save(envio)).thenReturn(envio);
+
+        Envio resultado = envioService.cambiarEstado(id, EstadoEnvio.EN_RUTA);
+
+        assertEquals(EstadoEnvio.EN_RUTA, resultado.getEstado());
+        verify(historialRepository).save(any(HistorialEstadoEnvio.class));
+        verify(envioRepository).save(envio);
+    }
+
+    @Test
+    void cambiarEstadoDePendienteACanceladoEsPermitido() {
+        envio.setEstado(EstadoEnvio.PENDIENTE);
+
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(envioRepository.save(envio)).thenReturn(envio);
+
+        Envio resultado = envioService.cambiarEstado(id, EstadoEnvio.CANCELADO);
+
+        assertEquals(EstadoEnvio.CANCELADO, resultado.getEstado());
+        verify(historialRepository).save(any(HistorialEstadoEnvio.class));
+        verify(envioRepository).save(envio);
+    }
+
+    @Test
+    void cambiarEstadoDeEnRutaAEntregadoEsPermitido() {
+        envio.setEstado(EstadoEnvio.EN_RUTA);
+
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(envioRepository.save(envio)).thenReturn(envio);
+
+        Envio resultado = envioService.cambiarEstado(id, EstadoEnvio.ENTREGADO);
+
+        assertEquals(EstadoEnvio.ENTREGADO, resultado.getEstado());
+        verify(historialRepository).save(any(HistorialEstadoEnvio.class));
+        verify(envioRepository).save(envio);
+    }
+
+    @Test
+    void cambiarEstadoDePendienteAEntregadoLanzaExcepcion() {
+        envio.setEstado(EstadoEnvio.PENDIENTE);
+
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+
+        ResponseStatusException excepcion = assertThrows(
+                ResponseStatusException.class,
+                () -> envioService.cambiarEstado(id, EstadoEnvio.ENTREGADO));
+
+        assertEquals(HttpStatus.CONFLICT, excepcion.getStatusCode());
+        verify(envioRepository, never()).save(any(Envio.class));
+        verify(historialRepository, never()).save(any(HistorialEstadoEnvio.class));
+    }
+
+    @Test
+    void cambiarEstadoDeEnRutaACanceladoLanzaExcepcion() {
+        envio.setEstado(EstadoEnvio.EN_RUTA);
+
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+
+        ResponseStatusException excepcion = assertThrows(
+                ResponseStatusException.class,
+                () -> envioService.cambiarEstado(id, EstadoEnvio.CANCELADO));
+
+        assertEquals(HttpStatus.CONFLICT, excepcion.getStatusCode());
+        verify(envioRepository, never()).save(any(Envio.class));
+        verify(historialRepository, never()).save(any(HistorialEstadoEnvio.class));
+    }
+
+    @Test
+    void cambiarEstadoConEstadoNuloLanzaExcepcion() {
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+
+        ResponseStatusException excepcion = assertThrows(
+                ResponseStatusException.class,
+                () -> envioService.cambiarEstado(id, null));
+
+        assertEquals(HttpStatus.BAD_REQUEST, excepcion.getStatusCode());
+        verify(envioRepository, never()).save(any(Envio.class));
+        verify(historialRepository, never()).save(any(HistorialEstadoEnvio.class));
     }
 
 }

@@ -1,4 +1,4 @@
-/*package com.logirock.shipment_service.controllers;
+package com.logirock.shipment_service.controllers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 
 import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
+import com.logirock.shipment_service.models.Direccion;
 import com.logirock.shipment_service.services.EnvioService;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,8 +30,23 @@ public class EnvioControllerTest {
     @Test
     void cancelarEnvioRetornaRespuestaExitosaConEstadoCancelado() {
         UUID id = UUID.randomUUID();
-        EnvioResponseDto responseDto = new EnvioResponseDto(id, "TRK-123", 2.0, 10.0, 20.0, 30.0,
-                EstadoEnvio.CANCELADO);
+        UUID clienteId = UUID.randomUUID();
+
+        Direccion origen = new Direccion(/* datos requeridos */);
+        Direccion destino = new Direccion(/* datos requeridos */);
+
+        EnvioResponseDto responseDto = new EnvioResponseDto(
+                id,
+                "TRK-123",
+                2.0,
+                10.0,
+                20.0,
+                30.0,
+                EstadoEnvio.CANCELADO,
+                clienteId,
+                "Cliente de prueba",
+                origen,
+                destino);
         when(envioService.cancelarEnvio(id)).thenReturn(responseDto);
 
         ResponseEntity<EnvioResponseDto> response = envioController.cancelarEnvio(id);
@@ -39,4 +55,3 @@ public class EnvioControllerTest {
         assertEquals(EstadoEnvio.CANCELADO, response.getBody().getEstado());
     }
 }
-*/
