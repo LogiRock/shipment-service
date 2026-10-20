@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -99,6 +100,10 @@ public class EnvioController {
                 .stream()
                 .map(this::convertirAResponse)
                 .toList();
+    }
+    @PostMapping("/{id}/cancelacion")
+    public ResponseEntity<EnvioResponseDto> cancelarEnvio(@PathVariable UUID id) {
+        return ResponseEntity.ok(envioService.cancelarEnvio(id));
     }
 
 }

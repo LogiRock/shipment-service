@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.logirock.shipment_service.dto.EnvioResponseDto;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +33,7 @@ class EnvioServiceImplTest {
     @InjectMocks
     private EnvioServiceImpl envioService;
 
+    private UUID id;
     private Envio envio;
 
     @BeforeEach
@@ -154,6 +157,35 @@ class EnvioServiceImplTest {
 
         verify(envioRepository, times(1))
                 .findByCodigoSeguimiento(codigo);
+    }
+
+    @Test
+    void cancelarEnvioActualizaEstadoYRetornaEnvioCancelado() {
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(envioRepository.save(envio)).thenReturn(envio);
+
+        EnvioResponseDto response = envioService.cancelarEnvio(id);
+
+        assertEquals(EstadoEnvio.CANCELADO, response.getEstado());
+        assertEquals(id, response.getId());
+        verify(envioRepository).save(envio);
+    }
+
+    @Test
+    void cancelarEnvioLanzaExcepcionCuandoNoExiste() {
+        when(envioRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> envioService.cancelarEnvio(id));
+        verify(envioRepository, never()).save(envio);
+    }
+
+    @Test
+    void cancelarEnvioRechazaEstadosDistintosDePendiente() {
+        envio.setEstado(EstadoEnvio.EN_RUTA);
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+
+        assertThrows(IllegalStateException.class, () -> envioService.cancelarEnvio(id));
+        verify(envioRepository, never()).save(envio);
     }
 
 }
