@@ -2,20 +2,6 @@
 
 Microservicio REST de LogiTrack para administrar clientes, envíos y repartidores. También permite asignar repartidores, actualizar el estado de los envíos y consultar el historial de esos cambios.
 
-## Estado frente a la consigna del Sprint 1
-
-El proyecto incluye la gestión de clientes, envíos y repartidores; la asignación de repartidores; las transiciones de estado con historial; persistencia JPA; respuestas mediante DTOs; manejo global de errores; documentación OpenAPI/Swagger; y pruebas unitarias y de persistencia.
-
-Antes de considerar completa la entrega, quedan por resolver estos puntos de la consigna:
-
-- El `pom.xml` usa Spring Boot `4.1.1`; la consigna especifica Spring Boot `3.x`.
-- No se incluyen `Dockerfile` ni `docker-compose.yml`, solicitados para levantar el servicio y MySQL.
-- No se encontró un script inicial de base de datos.
-- La consigna pide cobertura de pruebas para el cálculo de tarifas; no hay actualmente funcionalidad ni pruebas de tarifas en el código.
-- `EnvioResponseDto` expone `Direccion`, que pertenece al modelo persistente. Para desacoplar por completo la API de JPA, conviene reemplazarlo por un DTO de dirección.
-
-La guía de ejecución de abajo describe el modo local manual con MySQL. Ese modo sirve para desarrollar y probar el servicio, pero no reemplaza los entregables Docker que pide la consigna.
-
 ## Requisitos
 
 - JDK 25.
