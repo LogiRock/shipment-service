@@ -1,6 +1,6 @@
 # Shipment Service
 
-Microservicio REST de LogiTrack para administrar clientes, envíos y repartidores. También permite asignar repartidores, actualizar el estado de los envíos y consultar el historial de esos cambios.
+Microservicio REST de LogiTrack para administrar clientes y envíos. Mantiene el identificador lógico del courier asignado, actualiza el estado de los envíos y consulta el historial de esos cambios.
 
 ## Requisitos
 
@@ -96,28 +96,6 @@ Crear cliente:
 
 Nombre, email y teléfono son obligatorios; el email debe tener formato válido. El email y el teléfono deben ser únicos. Una solicitud inválida responde `400`, una duplicada `409` y un UUID inexistente `404`.
 
-### Repartidores — `/api/v1/repartidores`
-
-| Método | Ruta | Resultado principal |
-| --- | --- | --- |
-| `POST` | `/api/v1/repartidores` | Registra y devuelve un repartidor (`201`). |
-| `GET` | `/api/v1/repartidores` | Devuelve todos los repartidores (`200`). |
-| `GET` | `/api/v1/repartidores/{id}` | Devuelve un repartidor (`200`). |
-| `PUT` | `/api/v1/repartidores/{id}` | Actualiza y devuelve el repartidor (`200`). |
-| `DELETE` | `/api/v1/repartidores/{id}` | Elimina el repartidor (`204`). |
-
-Crear repartidor:
-
-```json
-{
-  "nombre": "Juan López",
-  "tipoVehiculo": "Motocicleta",
-  "estado": "ACTIVO"
-}
-```
-
-`estado` admite `ACTIVO` o `INACTIVO`. Nombre, vehículo y estado son obligatorios. Una solicitud inválida responde `400`; un UUID inexistente responde `404`.
-
 ### Envíos — `/api/envios`
 
 | Método | Ruta | Resultado principal |
@@ -129,7 +107,7 @@ Crear repartidor:
 | `GET` | `/api/envios/estado/{estado}` | Filtra por estado (`200`; `400` si el estado no es válido). |
 | `PUT` | `/api/envios/{id}` | Actualiza peso, dimensiones, direcciones y cliente (`200`). |
 | `DELETE` | `/api/envios/{id}` | Elimina físicamente el envío (`204`). |
-| `PUT` | `/api/envios/{envioId}/repartidor/{repartidorId}` | Asigna un repartidor (`200`). |
+| `PUT` | `/api/envios/{envioId}/courier/{courierId}` | Asigna el ID lógico de un courier (`200`). |
 | `POST` | `/api/envios/{id}/cancelacion` | Cancela un envío pendiente (`200`). |
 | `PATCH` | `/api/envios/{id}/estado` | Cambia el estado según el ciclo de vida (`200`). |
 | `GET` | `/api/envios/{id}/historial` | Consulta los cambios de estado de un envío (`200`). |
@@ -160,11 +138,11 @@ Crear o actualizar envío:
 
 Las dimensiones y el peso deben ser mayores que cero. Origen, destino y un UUID de cliente existente son obligatorios. El código de seguimiento y el estado inicial se generan en el servicio.
 
-La respuesta de envío contiene `id`, `codigoSeguimiento`, dimensiones, `estado`, `clienteId`, `clienteNombre`, `origen`, `destino` y `repartidorId`. `repartidorId` es `null` hasta que se asigne un repartidor.
+La respuesta de envío contiene `id`, `codigoSeguimiento`, dimensiones, `estado`, `clienteId`, `clienteNombre`, `origen`, `destino` y `courierId`. `courierId` es un `Long` y permanece `null` hasta que se asigne un courier.
 
-#### Asignar un repartidor
+#### Asignar un courier
 
-Ejemplo: `PUT /api/envios/9b715c47-1a23-4b70-a146-fbf0ff47b001/repartidor/7f7a2b5b-51aa-4ce8-9c6e-345aaabf0d7b`. No requiere cuerpo. El envío debe estar `PENDIENTE`, el repartidor debe existir y estar `ACTIVO`, y un envío no puede cambiar a un repartidor distinto una vez asignado. La respuesta incluye el UUID del repartidor. Los IDs inexistentes responden `404`; las reglas incompatibles, `409`.
+Ejemplo: `PUT /api/envios/9b715c47-1a23-4b70-a146-fbf0ff47b001/courier/123`. No requiere cuerpo. El envío debe estar `PENDIENTE` y no puede cambiar a otro courier una vez asignado. Shipment Service guarda el `Long courierId` como identificador lógico; la administración y validación del courier pertenecen a Courier Service. Las reglas incompatibles responden `409`.
 
 #### Cambiar el estado
 
@@ -180,8 +158,8 @@ Transiciones admitidas:
 
 | Estado actual | Estado solicitado | Condición |
 | --- | --- | --- |
-| `PENDIENTE` | `EN_RUTA` | Debe haber un repartidor asignado. |
-| `PENDIENTE` | `CANCELADO` | No requiere repartidor. |
+| `PENDIENTE` | `EN_RUTA` | Debe haber un courier asignado. |
+| `PENDIENTE` | `CANCELADO` | No requiere courier. |
 | `EN_RUTA` | `ENTREGADO` | El envío debe estar en ruta. |
 
 Las demás transiciones responden `409`. El cambio se persiste y se agrega al historial. La operación `POST /api/envios/{id}/cancelacion` aplica la misma regla que `PENDIENTE → CANCELADO`.
@@ -201,7 +179,7 @@ Las respuestas de error usan el formato `timestamp`, `status`, `error`, `message
 | Código HTTP | Significado habitual |
 | --- | --- |
 | `400` | Cuerpo inválido, validación fallida o valor de ruta que no se puede convertir. |
-| `404` | No existe el cliente, envío o repartidor solicitado. |
+| `404` | No existe el cliente o envío solicitado. |
 | `409` | Conflicto con una regla de negocio o transición de estado. |
 | `500` | Error interno no contemplado. |
 
@@ -222,8 +200,8 @@ La suite incluye pruebas unitarias de servicios, controladores y manejo de error
 - `repositories`: persistencia con Spring Data JPA.
 - `models`: entidades; `Direccion` es un objeto embebido.
 - `dto`: contratos de entrada y salida de la API; las respuestas no exponen directamente la mayoría de las entidades.
-- `enums`: estados de envíos y repartidores.
+- `enums`: estados de envíos.
 - `exceptions`: formato centralizado de respuestas de error.
-- Los IDs son UUID. El envío tiene un cliente obligatorio y hasta un repartidor; un repartidor puede asociarse a varios envíos.
+- Los clientes y envíos usan UUID. El envío tiene un cliente obligatorio y guarda opcionalmente el `courierId` (`Long`) como identificador lógico, sin relación de base de datos con Courier Service.
 - Hibernate actualiza el esquema con `ddl-auto=update`; las migraciones no están configuradas.
 - La configuración actual de `pom.xml` usa Spring Boot `4.1.1` y Java `25`. La consigna del Sprint compartida anteriormente indica Spring Boot `3.x`; el equipo debería confirmar esa diferencia antes de la entrega.
