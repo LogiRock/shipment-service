@@ -17,18 +17,6 @@ CREATE TABLE IF NOT EXISTS clientes (
     UNIQUE KEY uk_clientes_email (email)
 );
 
-CREATE TABLE IF NOT EXISTS repartidores (
-    id BINARY(16) NOT NULL,
-    nombre VARCHAR(100) NOT NULL,
-    tipo_vehiculo VARCHAR(50) NOT NULL,
-    estado VARCHAR(20) NOT NULL,
-
-    fecha_creacion DATETIME(6),
-    fecha_ultima_actualizacion DATETIME(6),
-
-    PRIMARY KEY (id)
-);
-
 CREATE TABLE IF NOT EXISTS envios (
     id BINARY(16) NOT NULL,
     codigo_seguimiento VARCHAR(20) NOT NULL,
@@ -53,7 +41,7 @@ CREATE TABLE IF NOT EXISTS envios (
     destino_codigo_postal VARCHAR(255) NOT NULL,
 
     cliente_id BINARY(16) NOT NULL,
-    repartidor_id BINARY(16),
+    courier_id BIGINT,
 
     fecha_creacion DATETIME(6),
     fecha_ultima_actualizacion DATETIME(6),
@@ -64,12 +52,51 @@ CREATE TABLE IF NOT EXISTS envios (
 
     CONSTRAINT fk_envios_clientes
         FOREIGN KEY (cliente_id)
-        REFERENCES clientes(id),
-
-    CONSTRAINT fk_envios_repartidores
-        FOREIGN KEY (repartidor_id)
-        REFERENCES repartidores(id)
+        REFERENCES clientes(id)
 );
+
+-- Migra instalaciones existentes que todavía tenían la relación local con repartidores.
+-- Las asignaciones UUID anteriores se eliminan: deben reasignarse usando IDs de courier-service.
+SET @drop_repartidores_fk = (
+    SELECT IF(COUNT(*) > 0,
+        'ALTER TABLE envios DROP FOREIGN KEY fk_envios_repartidores',
+        'SELECT 1')
+    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'envios'
+      AND CONSTRAINT_NAME = 'fk_envios_repartidores'
+);
+PREPARE migration_stmt FROM @drop_repartidores_fk;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @add_courier_id = (
+    SELECT IF(COUNT(*) = 0,
+        'ALTER TABLE envios ADD COLUMN courier_id BIGINT NULL',
+        'SELECT 1')
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'envios'
+      AND COLUMN_NAME = 'courier_id'
+);
+PREPARE migration_stmt FROM @add_courier_id;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @drop_repartidor_id = (
+    SELECT IF(COUNT(*) > 0,
+        'ALTER TABLE envios DROP COLUMN repartidor_id',
+        'SELECT 1')
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'envios'
+      AND COLUMN_NAME = 'repartidor_id'
+);
+PREPARE migration_stmt FROM @drop_repartidor_id;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+DROP TABLE IF EXISTS repartidores;
 
 CREATE TABLE IF NOT EXISTS historial_estados_envio (
     id BINARY(16) NOT NULL,
@@ -105,23 +132,6 @@ INSERT INTO clientes (
 ON DUPLICATE KEY UPDATE id = id;
 
 
-INSERT INTO repartidores (
-    id,
-    nombre,
-    tipo_vehiculo,
-    estado,
-    fecha_creacion,
-    fecha_ultima_actualizacion
-) VALUES (
-    UUID_TO_BIN('22222222-2222-4222-8222-222222222222'),
-    'Carlos Gomez',
-    'Motocicleta',
-    'ACTIVO',
-    NOW(6),
-    NOW(6)
-)
-ON DUPLICATE KEY UPDATE id = id;
-
 INSERT INTO envios (
     id,
     codigo_seguimiento,
@@ -139,7 +149,7 @@ INSERT INTO envios (
     destino_ciudad,
     destino_codigo_postal,
     cliente_id,
-    repartidor_id,
+    courier_id,
     fecha_creacion,
     fecha_ultima_actualizacion
 ) VALUES (
@@ -159,7 +169,7 @@ INSERT INTO envios (
     'Palpala',
     '4612',
     UUID_TO_BIN('11111111-1111-4111-8111-111111111111'),
-    UUID_TO_BIN('22222222-2222-4222-8222-222222222222'),
+    1,
     NOW(6),
     NOW(6)
 )

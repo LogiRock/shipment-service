@@ -2,11 +2,8 @@ package com.logirock.shipment_service.services.impl;
 
 import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
-import com.logirock.shipment_service.enums.EstadoRepartidor;
 import com.logirock.shipment_service.models.Envio;
-import com.logirock.shipment_service.models.Repartidor;
 import com.logirock.shipment_service.repositories.EnvioRepository;
-import com.logirock.shipment_service.repositories.RepartidorRepository;
 import com.logirock.shipment_service.models.Cliente;
 import com.logirock.shipment_service.models.HistorialEstadoEnvio;
 import com.logirock.shipment_service.repositories.HistorialEstadoEnvioRepository;
@@ -36,7 +33,6 @@ public class EnvioServiceImpl implements EnvioService {
     private final HistorialEstadoEnvioRepository historialRepository;
     private final ClienteService clienteService;
 
-    private final RepartidorRepository repartidorRepository;
 
     @Override
     public Envio crear(Envio envio, UUID clienteId) {
@@ -116,26 +112,21 @@ public class EnvioServiceImpl implements EnvioService {
     }
 
     @Override
-    public Envio asignarRepartidor(UUID envioId, UUID repartidorId) {
+    public Envio asignarCourier(UUID envioId, Long courierId) {
         Envio envio = envioRepository.findById(envioId)
                 .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún envío con el ID: " + envioId));
 
-        Repartidor repartidor = repartidorRepository.findById(repartidorId)
-                .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún repartidor con el ID: " + repartidorId));
-
-        if (repartidor.getEstado() != EstadoRepartidor.ACTIVO) {
-            throw new IllegalArgumentException("No se puede asignar un repartidor INACTIVO.");
+        if (courierId == null || courierId <= 0) {
+            throw new IllegalArgumentException("El ID del courier debe ser positivo.");
         }
-
         if (envio.getEstado() != EstadoEnvio.PENDIENTE) {
-            throw new IllegalArgumentException("Solo se puede asignar un repartidor a un envío PENDIENTE.");
+            throw new IllegalArgumentException("Solo se puede asignar un courier a un envío PENDIENTE.");
+        }
+        if (envio.getCourierId() != null && !envio.getCourierId().equals(courierId)) {
+            throw new IllegalArgumentException("El envío ya tiene asignado otro courier.");
         }
 
-        if (envio.getRepartidor() != null && !envio.getRepartidor().getId().equals(repartidorId)) {
-            throw new IllegalArgumentException("El envío ya tiene asignado otro repartidor.");
-        }
-
-        envio.setRepartidor(repartidor);
+        envio.setCourierId(courierId);
         return envioRepository.save(envio);
     }
 
@@ -148,7 +139,7 @@ public class EnvioServiceImpl implements EnvioService {
                 envio.getAlto(),
                 envio.getLargo(),
                 envio.getEstado(),
-                envio.getRepartidor() == null ? null : envio.getRepartidor().getId(),
+                envio.getCourierId(),
 
                 envio.getCliente().getId(),
                 envio.getCliente().getNombre(),
@@ -168,7 +159,7 @@ public class EnvioServiceImpl implements EnvioService {
 
         boolean transicionPermitida = (estadoActual == EstadoEnvio.PENDIENTE
                 && (nuevoEstado == EstadoEnvio.CANCELADO
-                        || (nuevoEstado == EstadoEnvio.EN_RUTA && envio.getRepartidor() != null)))
+                        || (nuevoEstado == EstadoEnvio.EN_RUTA && envio.getCourierId() != null)))
                 || (estadoActual == EstadoEnvio.EN_RUTA
                         && nuevoEstado == EstadoEnvio.ENTREGADO);
 
@@ -177,8 +168,8 @@ public class EnvioServiceImpl implements EnvioService {
                     CONFLICT,
                     estadoActual == EstadoEnvio.PENDIENTE
                             && nuevoEstado == EstadoEnvio.EN_RUTA
-                            && envio.getRepartidor() == null
-                                    ? "No se puede poner el envío EN_RUTA sin asignarle un repartidor."
+                            && envio.getCourierId() == null
+                                    ? "No se puede poner el envío EN_RUTA sin asignarle un courier."
                                     : "Transición de estado no permitida: " + estadoActual + " -> " + nuevoEstado);
         }
 

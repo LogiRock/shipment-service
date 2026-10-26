@@ -1,7 +1,6 @@
 package com.logirock.shipment_service.repositories;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.UUID;
 
@@ -12,18 +11,16 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.test.context.TestPropertySource;
 
 import com.logirock.shipment_service.enums.EstadoEnvio;
-import com.logirock.shipment_service.enums.EstadoRepartidor;
 import com.logirock.shipment_service.models.Cliente;
 import com.logirock.shipment_service.models.Direccion;
 import com.logirock.shipment_service.models.Envio;
-import com.logirock.shipment_service.models.Repartidor;
 
 import jakarta.persistence.EntityManager;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestPropertySource(properties = {
-        "spring.datasource.url=jdbc:h2:mem:shipment-assignment;DB_CLOSE_DELAY=-1",
+        "spring.datasource.url=jdbc:h2:mem:shipment-courier-refactor;DB_CLOSE_DELAY=-1",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
@@ -36,46 +33,31 @@ class EnvioAsignacionJpaTest {
     private EnvioRepository envioRepository;
 
     @Autowired
-    private RepartidorRepository repartidorRepository;
-
-    @Autowired
     private ClienteRepository clienteRepository;
 
     @Autowired
     private EntityManager entityManager;
 
     @Test
-    void unRepartidorPuedeTenerVariosEnviosYLaAsignacionSePersiste() {
-        Repartidor repartidor = new Repartidor();
-        repartidor.setNombre("Juan Pérez");
-        repartidor.setTipoVehiculo("Motocicleta");
-        repartidor.setEstado(EstadoRepartidor.ACTIVO);
-        repartidor = repartidorRepository.saveAndFlush(repartidor);
-
+    void courierIdLogicoSePersisteSinRelacionConEntidadCourier() {
         Cliente cliente = new Cliente();
         cliente.setNombre("Ana Pérez");
-        cliente.setEmail("ana.asignacion@example.com");
+        cliente.setEmail("ana.courier@example.com");
         cliente.setTelefono("+5491100000000");
         cliente = clienteRepository.saveAndFlush(cliente);
 
-        Envio primerEnvio = crearEnvio("ENV-AAAA0001", repartidor, cliente);
-        Envio segundoEnvio = crearEnvio("ENV-AAAA0002", repartidor, cliente);
-        envioRepository.saveAndFlush(primerEnvio);
-        envioRepository.saveAndFlush(segundoEnvio);
-        UUID repartidorId = repartidor.getId();
-        UUID primerEnvioId = primerEnvio.getId();
-        UUID segundoEnvioId = segundoEnvio.getId();
+        Long courierId = 123L;
+        Envio envio = crearEnvio("ENV-AAAA0001", courierId, cliente);
+        envioRepository.saveAndFlush(envio);
+        UUID envioId = envio.getId();
         entityManager.clear();
 
-        Envio envioPersistido = envioRepository.findById(primerEnvioId).orElseThrow();
-        Envio segundoEnvioPersistido = envioRepository.findById(segundoEnvioId).orElseThrow();
+        Envio envioPersistido = envioRepository.findById(envioId).orElseThrow();
 
-        assertNotNull(envioPersistido.getRepartidor());
-        assertEquals(repartidorId, envioPersistido.getRepartidor().getId());
-        assertEquals(repartidorId, segundoEnvioPersistido.getRepartidor().getId());
+        assertEquals(courierId, envioPersistido.getCourierId());
     }
 
-    private Envio crearEnvio(String codigo, Repartidor repartidor, Cliente cliente) {
+    private Envio crearEnvio(String codigo, Long courierId, Cliente cliente) {
         Envio envio = new Envio();
         envio.setCodigoSeguimiento(codigo);
         envio.setPeso(2.0);
@@ -85,7 +67,7 @@ class EnvioAsignacionJpaTest {
         envio.setEstado(EstadoEnvio.PENDIENTE);
         envio.setOrigen(direccion());
         envio.setDestino(direccion());
-        envio.setRepartidor(repartidor);
+        envio.setCourierId(courierId);
         envio.setCliente(cliente);
         return envio;
     }

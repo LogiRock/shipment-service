@@ -9,6 +9,6 @@ import io.swagger.v3.oas.annotations.info.Info;
 @OpenAPIDefinition(info = @Info(
         title = "LogiTrack Shipment Service API",
         version = "v1",
-        description = "API REST para gestionar clientes, envíos y repartidores de LogiTrack."))
+        description = "API REST para gestionar clientes y envíos de LogiTrack."))
 public class OpenApiConfig {
 }

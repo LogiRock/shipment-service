@@ -15,16 +15,13 @@ import org.springframework.http.ResponseEntity;
 
 import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
-import com.logirock.shipment_service.enums.EstadoRepartidor;
 import com.logirock.shipment_service.models.Cliente;
 import com.logirock.shipment_service.models.Envio;
-import com.logirock.shipment_service.models.Repartidor;
 import com.logirock.shipment_service.models.Direccion;
 import com.logirock.shipment_service.services.EnvioService;
 
 @ExtendWith(MockitoExtension.class)
-
-public class EnvioControllerTest {
+class EnvioControllerTest {
     @Mock
     private EnvioService envioService;
 
@@ -35,24 +32,11 @@ public class EnvioControllerTest {
     void cancelarEnvioRetornaRespuestaExitosaConEstadoCancelado() {
         UUID id = UUID.randomUUID();
         UUID clienteId = UUID.randomUUID();
-        UUID repartidorId = UUID.randomUUID();
-
-        Direccion origen = new Direccion(/* datos requeridos */);
-        Direccion destino = new Direccion(/* datos requeridos */);
-
+        Direccion origen = new Direccion();
+        Direccion destino = new Direccion();
         EnvioResponseDto responseDto = new EnvioResponseDto(
-                id,
-                "TRK-123",
-                2.0,
-                10.0,
-                20.0,
-                30.0,
-                EstadoEnvio.CANCELADO,
-                repartidorId,
-                clienteId,
-                "Cliente de prueba",
-                origen,
-                destino);
+                id, "TRK-123", 2.0, 10.0, 20.0, 30.0, EstadoEnvio.CANCELADO,
+                null, clienteId, "Cliente de prueba", origen, destino);
         when(envioService.cancelarEnvio(id)).thenReturn(responseDto);
 
         ResponseEntity<EnvioResponseDto> response = envioController.cancelarEnvio(id);
@@ -62,9 +46,9 @@ public class EnvioControllerTest {
     }
 
     @Test
-    void asignarRepartidorRetornaElEnvioConElRepartidorAsignado() {
+    void asignarCourierRetornaElEnvioConElIdLogicoAsignado() {
         UUID envioId = UUID.randomUUID();
-        UUID repartidorId = UUID.randomUUID();
+        Long courierId = 123L;
         Envio envio = new Envio();
         envio.setId(envioId);
         envio.setCodigoSeguimiento("ENV-ABC12345");
@@ -73,19 +57,16 @@ public class EnvioControllerTest {
         envio.setAlto(20.0);
         envio.setLargo(30.0);
         envio.setEstado(EstadoEnvio.PENDIENTE);
+        envio.setCourierId(courierId);
         Cliente cliente = new Cliente();
         cliente.setId(UUID.randomUUID());
         cliente.setNombre("Cliente de prueba");
         envio.setCliente(cliente);
-        Repartidor repartidor = new Repartidor();
-        repartidor.setId(repartidorId);
-        repartidor.setEstado(EstadoRepartidor.ACTIVO);
-        envio.setRepartidor(repartidor);
-        when(envioService.asignarRepartidor(envioId, repartidorId)).thenReturn(envio);
+        when(envioService.asignarCourier(envioId, courierId)).thenReturn(envio);
 
-        ResponseEntity<EnvioResponseDto> response = envioController.asignarRepartidor(envioId, repartidorId);
+        ResponseEntity<EnvioResponseDto> response = envioController.asignarCourier(envioId, courierId);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(repartidorId, response.getBody().getRepartidorId());
+        assertEquals(courierId, response.getBody().getCourierId());
     }
 }

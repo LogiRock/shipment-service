@@ -140,7 +140,7 @@ public class EnvioController {
                                 envio.getLargo(),
                                 envio.getEstado(),
 
-                                envio.getRepartidor() == null ? null : envio.getRepartidor().getId(),
+                                envio.getCourierId(),
                                 envio.getCliente().getId(),
                                 envio.getCliente().getNombre(),
                                 envio.getOrigen(),
@@ -174,27 +174,27 @@ public class EnvioController {
                 return ResponseEntity.ok(envioService.cancelarEnvio(id));
         }
 
-        @PutMapping("/{envioId}/repartidor/{repartidorId}")
-        @Operation(summary = "Asignar repartidor", description = "Asigna un repartidor ACTIVO a un envío PENDIENTE. Cada envío admite uno y un repartidor puede tener varios envíos.")
+        @PutMapping("/{envioId}/courier/{courierId}")
+        @Operation(summary = "Asignar courier", description = "Asigna el ID lógico de un courier a un envío PENDIENTE.")
         @ApiResponses({
-                        @ApiResponse(responseCode = "200", description = "Repartidor asignado", content = @Content(schema = @Schema(implementation = EnvioResponseDto.class), examples = @ExampleObject(value = "{\"id\":\"9b715c47-1a23-4b70-a146-fbf0ff47b001\",\"codigoSeguimiento\":\"ENV-A1B2C3D4\",\"peso\":2.5,\"ancho\":10.0,\"alto\":20.0,\"largo\":30.0,\"estado\":\"PENDIENTE\",\"repartidorId\":\"7f7a2b5b-51aa-4ce8-9c6e-345aaabf0d7b\"}"))),
-                        @ApiResponse(responseCode = "404", description = "Envío o repartidor inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
-                        @ApiResponse(responseCode = "409", description = "El repartidor está inactivo, el envío no está pendiente o ya tiene otro repartidor", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+                        @ApiResponse(responseCode = "200", description = "Courier asignado", content = @Content(schema = @Schema(implementation = EnvioResponseDto.class), examples = @ExampleObject(value = "{\"id\":\"9b715c47-1a23-4b70-a146-fbf0ff47b001\",\"codigoSeguimiento\":\"ENV-A1B2C3D4\",\"peso\":2.5,\"ancho\":10.0,\"alto\":20.0,\"largo\":30.0,\"estado\":\"PENDIENTE\",\"courierId\":123}"))),
+                        @ApiResponse(responseCode = "404", description = "Envío inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
+                        @ApiResponse(responseCode = "409", description = "El envío no está pendiente o ya tiene otro courier", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
         })
-        public ResponseEntity<EnvioResponseDto> asignarRepartidor(
+        public ResponseEntity<EnvioResponseDto> asignarCourier(
                         @Parameter(description = "UUID del envío", required = true) @PathVariable UUID envioId,
-                        @Parameter(description = "UUID del repartidor activo", required = true) @PathVariable UUID repartidorId) {
-                Envio envio = envioService.asignarRepartidor(envioId, repartidorId);
+                        @Parameter(description = "Identificador Long del courier", required = true) @PathVariable Long courierId) {
+                Envio envio = envioService.asignarCourier(envioId, courierId);
                 return ResponseEntity.ok(convertirAResponse(envio));
         }
 
         @PatchMapping("/{id}/estado")
-        @Operation(summary = "Cambiar estado del envío", description = "Transiciones permitidas: PENDIENTE a EN_RUTA (requiere repartidor asignado), PENDIENTE a CANCELADO y EN_RUTA a ENTREGADO.")
+        @Operation(summary = "Cambiar estado del envío", description = "Transiciones permitidas: PENDIENTE a EN_RUTA (requiere courier asignado), PENDIENTE a CANCELADO y EN_RUTA a ENTREGADO.")
         @ApiResponses({
                         @ApiResponse(responseCode = "200", description = "Estado actualizado y cambio registrado en el historial"),
                         @ApiResponse(responseCode = "400", description = "Falta el estado o el valor no es válido", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
                         @ApiResponse(responseCode = "404", description = "Envío inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
-                        @ApiResponse(responseCode = "409", description = "Transición no permitida o falta asignar un repartidor antes de iniciar el recorrido", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+                        @ApiResponse(responseCode = "409", description = "Transición no permitida o falta asignar un courier antes de iniciar el recorrido", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
         })
         public EnvioResponseDto cambiarEstado(
                         @Parameter(description = "UUID del envío", required = true) @PathVariable UUID id,
