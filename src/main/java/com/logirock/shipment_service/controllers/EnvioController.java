@@ -177,13 +177,15 @@ public class EnvioController {
         @PutMapping("/{envioId}/courier/{courierId}")
         @Operation(summary = "Asignar courier", description = "Asigna el ID lógico de un courier a un envío PENDIENTE.")
         @ApiResponses({
-                        @ApiResponse(responseCode = "200", description = "Courier asignado", content = @Content(schema = @Schema(implementation = EnvioResponseDto.class), examples = @ExampleObject(value = "{\"id\":\"9b715c47-1a23-4b70-a146-fbf0ff47b001\",\"codigoSeguimiento\":\"ENV-A1B2C3D4\",\"peso\":2.5,\"ancho\":10.0,\"alto\":20.0,\"largo\":30.0,\"estado\":\"PENDIENTE\",\"courierId\":123}"))),
-                        @ApiResponse(responseCode = "404", description = "Envío inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
+                        @ApiResponse(responseCode = "200", description = "Courier activo asignado", content = @Content(schema = @Schema(implementation = EnvioResponseDto.class), examples = @ExampleObject(value = "{\"id\":\"9b715c47-1a23-4b70-a146-fbf0ff47b001\",\"codigoSeguimiento\":\"ENV-A1B2C3D4\",\"peso\":2.5,\"ancho\":10.0,\"alto\":20.0,\"largo\":30.0,\"estado\":\"PENDIENTE\",\"courierId\":\"1b6e8c5a-64f9-4e2a-ae1e-4e5da04533fd\"}"))),
+                        @ApiResponse(responseCode = "404", description = "Envío o courier inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
+                        @ApiResponse(responseCode = "400", description = "Courier inactivo o inválido", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
+                        @ApiResponse(responseCode = "503", description = "Courier Service no disponible", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
                         @ApiResponse(responseCode = "409", description = "El envío no está pendiente o ya tiene otro courier", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
         })
         public ResponseEntity<EnvioResponseDto> asignarCourier(
                         @Parameter(description = "UUID del envío", required = true) @PathVariable UUID envioId,
-                        @Parameter(description = "Identificador Long del courier", required = true) @PathVariable Long courierId) {
+                        @Parameter(description = "UUID del courier", required = true) @PathVariable UUID courierId) {
                 Envio envio = envioService.asignarCourier(envioId, courierId);
                 return ResponseEntity.ok(convertirAResponse(envio));
         }

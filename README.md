@@ -61,8 +61,11 @@ java -jar .\target\shipment-service-0.0.1-SNAPSHOT.jar
 | `DB_DATABASE_NAME` | Base de datos | `shipment_service` |
 | `DB_USERNAME` | Usuario local de la base | `<usuario_local>` |
 | `DB_PASSWORD` | Contraseña local de la base | `<contraseña_local>` |
+| `COURIER_SERVICE_URL` | URL base de Courier Service | `http://localhost:8082` |
 
 No guardar contraseñas ni secretos reales en el repositorio. En esta revisión se quitó `.env` del índice de Git sin borrar la copia local; `.gitignore` lo excluye de futuros commits. `.env.example` contiene solo nombres de variables y valores ficticios. Si el archivo versionado anteriormente incluía credenciales reales, deben rotarse: quitarlo del commit actual no elimina las versiones históricas del repositorio.
+
+Para ejecutar shipment fuera de Docker, Courier Service debe estar disponible en `http://localhost:8082` o se debe definir `COURIER_SERVICE_URL`. En Docker Compose se usa por defecto `http://host.docker.internal:8082`, por lo que Courier Service debe exponer ese puerto en el host.
 
 ## Swagger / OpenAPI
 
@@ -138,11 +141,11 @@ Crear o actualizar envío:
 
 Las dimensiones y el peso deben ser mayores que cero. Origen, destino y un UUID de cliente existente son obligatorios. El código de seguimiento y el estado inicial se generan en el servicio.
 
-La respuesta de envío contiene `id`, `codigoSeguimiento`, dimensiones, `estado`, `clienteId`, `clienteNombre`, `origen`, `destino` y `courierId`. `courierId` es un `Long` y permanece `null` hasta que se asigne un courier.
+La respuesta de envío contiene `id`, `codigoSeguimiento`, dimensiones, `estado`, `clienteId`, `clienteNombre`, `origen`, `destino` y `courierId`. `courierId` es un UUID y permanece `null` hasta que se asigne un courier.
 
 #### Asignar un courier
 
-Ejemplo: `PUT /api/envios/9b715c47-1a23-4b70-a146-fbf0ff47b001/courier/123`. No requiere cuerpo. El envío debe estar `PENDIENTE` y no puede cambiar a otro courier una vez asignado. Shipment Service guarda el `Long courierId` como identificador lógico; la administración y validación del courier pertenecen a Courier Service. Las reglas incompatibles responden `409`.
+Ejemplo: `PUT /api/envios/9b715c47-1a23-4b70-a146-fbf0ff47b001/courier/1b6e8c5a-64f9-4e2a-ae1e-4e5da04533fd`. No requiere cuerpo. Shipment Service consulta `GET /api/v1/repartidores/{id}` en Courier Service y solo asigna el UUID si el courier existe y está `ACTIVO`. El envío debe estar `PENDIENTE` y no puede cambiar a otro courier una vez asignado. Si no existe responde `404`, si está inactivo `400`, y si Courier Service no está disponible `503`; en todos esos casos no se persiste la asignación.
 
 #### Cambiar el estado
 
@@ -202,6 +205,6 @@ La suite incluye pruebas unitarias de servicios, controladores y manejo de error
 - `dto`: contratos de entrada y salida de la API; las respuestas no exponen directamente la mayoría de las entidades.
 - `enums`: estados de envíos.
 - `exceptions`: formato centralizado de respuestas de error.
-- Los clientes y envíos usan UUID. El envío tiene un cliente obligatorio y guarda opcionalmente el `courierId` (`Long`) como identificador lógico, sin relación de base de datos con Courier Service.
+- Los clientes, envíos y couriers usan UUID. El envío tiene un cliente obligatorio y guarda opcionalmente el `courierId` como identificador lógico, sin relación de base de datos con Courier Service.
 - Hibernate actualiza el esquema con `ddl-auto=update`; las migraciones no están configuradas.
 - La configuración actual de `pom.xml` usa Spring Boot `4.1.1` y Java `25`. La consigna del Sprint compartida anteriormente indica Spring Boot `3.x`; el equipo debería confirmar esa diferencia antes de la entrega.
