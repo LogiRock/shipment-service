@@ -40,7 +40,7 @@ public class EnvioResponseDto {
     private EstadoEnvio estado;
 
     @Schema(description = "Identificador lógico del courier asignado; null si todavía no hay asignación", example = "123", nullable = true)
-    private Long courierId;
+    private UUID courierId;
 
     @Schema(description = "UUID del cliente propietario del envío", example = "2e0d43cc-4fa3-4dc8-9b0d-67f57bb3b001")
     private UUID clienteId;

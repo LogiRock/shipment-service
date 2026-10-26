@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS envios (
     destino_codigo_postal VARCHAR(255) NOT NULL,
 
     cliente_id BINARY(16) NOT NULL,
-    courier_id BIGINT,
+    courier_id VARCHAR(36),
 
     fecha_creacion DATETIME(6),
     fecha_ultima_actualizacion DATETIME(6),
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS envios (
 );
 
 -- Migra instalaciones existentes que todavía tenían la relación local con repartidores.
--- Las asignaciones UUID anteriores se eliminan: deben reasignarse usando IDs de courier-service.
+-- Elimina la relación física con la tabla local de repartidores; courier-service es dueño de esos datos.
 SET @drop_repartidores_fk = (
     SELECT IF(COUNT(*) > 0,
         'ALTER TABLE envios DROP FOREIGN KEY fk_envios_repartidores',
@@ -72,7 +72,7 @@ DEALLOCATE PREPARE migration_stmt;
 
 SET @add_courier_id = (
     SELECT IF(COUNT(*) = 0,
-        'ALTER TABLE envios ADD COLUMN courier_id BIGINT NULL',
+        'ALTER TABLE envios ADD COLUMN courier_id VARCHAR(36) NULL',
         'SELECT 1')
     FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
@@ -82,6 +82,14 @@ SET @add_courier_id = (
 PREPARE migration_stmt FROM @add_courier_id;
 EXECUTE migration_stmt;
 DEALLOCATE PREPARE migration_stmt;
+
+-- courier-service identifica repartidores con UUID. Las asignaciones numéricas previas no
+-- pueden convertirse a UUID sin consultar courier-service, por eso se limpian antes del cambio.
+UPDATE envios
+SET courier_id = NULL
+WHERE courier_id IS NOT NULL
+  AND CAST(courier_id AS CHAR) NOT REGEXP '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+ALTER TABLE envios MODIFY COLUMN courier_id VARCHAR(36) NULL;
 
 SET @drop_repartidor_id = (
     SELECT IF(COUNT(*) > 0,
@@ -169,7 +177,7 @@ INSERT INTO envios (
     'Palpala',
     '4612',
     UUID_TO_BIN('11111111-1111-4111-8111-111111111111'),
-    1,
+    NULL,
     NOW(6),
     NOW(6)
 )

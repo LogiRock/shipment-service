@@ -9,6 +9,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.logirock.shipment_service.dto.EnvioResponseDto;
+import com.logirock.shipment_service.dto.CourierDto;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
+import java.nio.charset.StandardCharsets;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +45,8 @@ class EnvioServiceImplTest {
     private EnvioServiceImpl envioService;
     @Mock
     private HistorialEstadoEnvioRepository historialRepository;
+    @Mock
+    private RestTemplate restTemplate;
 
     private UUID id;
     private Envio envio;
@@ -228,21 +235,70 @@ class EnvioServiceImplTest {
 
     @Test
     void asignarCourierDebePersistirIdLogicoCuandoEnvioEstaPendiente() {
-        Long courierId = 123L;
+        UUID courierId = UUID.randomUUID();
+        CourierDto courier = new CourierDto();
+        courier.setId(courierId);
+        courier.setEstado("ACTIVO");
+        when(restTemplate.getForObject("http://localhost:8082/api/v1/repartidores/" + courierId, CourierDto.class)).thenReturn(courier);
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
         when(envioRepository.save(envio)).thenReturn(envio);
 
         Envio response = envioService.asignarCourier(id, courierId);
 
         assertEquals(courierId, response.getCourierId());
+        verify(restTemplate).getForObject("http://localhost:8082/api/v1/repartidores/" + courierId, CourierDto.class);
         verify(envioRepository).save(envio);
     }
 
     @Test
-    void asignarCourierDebeRechazarIdNuloONoPositivo() {
+    void asignarCourierDebeRechazarCourierInactivoSinGuardar() {
+        UUID courierId = UUID.randomUUID();
+        CourierDto courier = new CourierDto();
+        courier.setId(courierId);
+        courier.setEstado("INACTIVO");
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(restTemplate.getForObject("http://localhost:8082/api/v1/repartidores/" + courierId, CourierDto.class)).thenReturn(courier);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> envioService.asignarCourier(id, courierId));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        verify(envioRepository, never()).save(any(Envio.class));
+    }
+
+    @Test
+    void asignarCourierDebeRechazarCourierInexistenteSinGuardar() {
+        UUID courierId = UUID.randomUUID();
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(restTemplate.getForObject("http://localhost:8082/api/v1/repartidores/" + courierId, CourierDto.class))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.NOT_FOUND, "Not Found", HttpHeaders.EMPTY, new byte[0], StandardCharsets.UTF_8));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> envioService.asignarCourier(id, courierId));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+        verify(envioRepository, never()).save(any(Envio.class));
+    }
+
+    @Test
+    void asignarCourierDebeBloquearAsignacionSiCourierServiceNoResponde() {
+        UUID courierId = UUID.randomUUID();
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(restTemplate.getForObject("http://localhost:8082/api/v1/repartidores/" + courierId, CourierDto.class))
+                .thenThrow(new org.springframework.web.client.ResourceAccessException("connection refused"));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> envioService.asignarCourier(id, courierId));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, exception.getStatusCode());
+        verify(envioRepository, never()).save(any(Envio.class));
+    }
+
+    @Test
+    void asignarCourierDebeRechazarIdNulo() {
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
 
-        assertThrows(IllegalArgumentException.class, () -> envioService.asignarCourier(id, 0L));
+        assertThrows(IllegalArgumentException.class, () -> envioService.asignarCourier(id, null));
         verify(envioRepository, never()).save(any(Envio.class));
     }
 
@@ -250,7 +306,7 @@ class EnvioServiceImplTest {
     void asignarCourierDebeRechazarEnvioInexistente() {
         when(envioRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertThrows(EntityNotFoundException.class, () -> envioService.asignarCourier(id, 123L));
+        assertThrows(EntityNotFoundException.class, () -> envioService.asignarCourier(id, UUID.randomUUID()));
         verify(envioRepository, never()).save(any(Envio.class));
     }
 
@@ -259,23 +315,23 @@ class EnvioServiceImplTest {
         envio.setEstado(EstadoEnvio.EN_RUTA);
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
 
-        assertThrows(IllegalArgumentException.class, () -> envioService.asignarCourier(id, 123L));
+        assertThrows(IllegalArgumentException.class, () -> envioService.asignarCourier(id, UUID.randomUUID()));
         verify(envioRepository, never()).save(any(Envio.class));
     }
 
     @Test
     void asignarCourierDebeRechazarReemplazoDeCourier() {
-        envio.setCourierId(111L);
+        envio.setCourierId(UUID.randomUUID());
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
 
-        assertThrows(IllegalArgumentException.class, () -> envioService.asignarCourier(id, 123L));
+        assertThrows(IllegalArgumentException.class, () -> envioService.asignarCourier(id, UUID.randomUUID()));
         verify(envioRepository, never()).save(any(Envio.class));
     }
 
     @Test
     void cambiarEstadoDePendienteAEnRutaEsPermitidoCuandoTieneCourierId() {
         envio.setEstado(EstadoEnvio.PENDIENTE);
-        envio.setCourierId(123L);
+        envio.setCourierId(UUID.randomUUID());
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
         when(envioRepository.save(envio)).thenReturn(envio);
 

@@ -1,5 +1,6 @@
 package com.logirock.shipment_service.services.impl;
 
+import com.logirock.shipment_service.dto.CourierDto;
 import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
 import com.logirock.shipment_service.models.Envio;
@@ -14,9 +15,13 @@ import com.logirock.shipment_service.services.EnvioService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -33,6 +38,9 @@ public class EnvioServiceImpl implements EnvioService {
     private final HistorialEstadoEnvioRepository historialRepository;
     private final ClienteService clienteService;
 
+    private final RestTemplate restTemplate;
+    @Value("${courier.service.url:http://localhost:8082}")
+    private String courierUrl = "http://localhost:8082";
 
     @Override
     public Envio crear(Envio envio, UUID clienteId) {
@@ -112,18 +120,36 @@ public class EnvioServiceImpl implements EnvioService {
     }
 
     @Override
-    public Envio asignarCourier(UUID envioId, Long courierId) {
+    public Envio asignarCourier(UUID envioId, UUID courierId) {
         Envio envio = envioRepository.findById(envioId)
                 .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún envío con el ID: " + envioId));
 
-        if (courierId == null || courierId <= 0) {
-            throw new IllegalArgumentException("El ID del courier debe ser positivo.");
+        if (courierId == null) {
+            throw new IllegalArgumentException("El ID del courier es obligatorio.");
         }
         if (envio.getEstado() != EstadoEnvio.PENDIENTE) {
             throw new IllegalArgumentException("Solo se puede asignar un courier a un envío PENDIENTE.");
         }
         if (envio.getCourierId() != null && !envio.getCourierId().equals(courierId)) {
             throw new IllegalArgumentException("El envío ya tiene asignado otro courier.");
+        }
+
+        try {
+            String url = courierUrl + "/api/v1/repartidores/" + courierId;
+            CourierDto courier = restTemplate.getForObject(url, CourierDto.class);
+
+            if (courier == null || !courierId.equals(courier.getId())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "El repartidor no existe o la respuesta de courier-service no es válida.");
+            }
+            if (!"ACTIVO".equalsIgnoreCase(courier.getEstado())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El repartidor está INACTIVO; no se puede asignar el envío.");
+            }
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "El repartidor no existe en courier-service");
+        } catch (ResourceAccessException e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "No se pudo conectar con courier-service; no se asignó el envío.");
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "courier-service rechazó la consulta del repartidor.");
         }
 
         envio.setCourierId(courierId);

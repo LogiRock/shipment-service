@@ -17,9 +17,7 @@ services:
       - mysql_data:/var/lib/mysql
 
     healthcheck:
-      test:
-        - CMD-SHELL
-        - 'mysqladmin ping -h 127.0.0.1 -u root -p"$${MYSQL_ROOT_PASSWORD}" --silent'
+      test: ["CMD-SHELL", 'mysqladmin ping -h 127.0.0.1 -u root -p"$${MYSQL_ROOT_PASSWORD}" --silent']
       interval: 10s
       timeout: 5s
       retries: 10
@@ -43,9 +41,9 @@ services:
       DB_DATABASE_NAME: ${DB_DATABASE_NAME}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      COURIER_SERVICE_URL: ${COURIER_SERVICE_URL:-http://host.docker.internal:8082}
 
-    ports:
-      - "8080:8080"
+    ports: ["8080:8080"]
 
     depends_on:
       mysql:

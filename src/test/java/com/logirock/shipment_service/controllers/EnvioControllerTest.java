@@ -48,7 +48,7 @@ class EnvioControllerTest {
     @Test
     void asignarCourierRetornaElEnvioConElIdLogicoAsignado() {
         UUID envioId = UUID.randomUUID();
-        Long courierId = 123L;
+        UUID courierId = UUID.randomUUID();
         Envio envio = new Envio();
         envio.setId(envioId);
         envio.setCodigoSeguimiento("ENV-ABC12345");

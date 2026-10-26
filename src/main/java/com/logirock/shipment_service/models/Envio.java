@@ -7,6 +7,8 @@ import com.logirock.shipment_service.enums.EstadoEnvio;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.Column;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -94,8 +96,9 @@ public class Envio extends Auditable{
 
 
     /** Identificador lógico del courier asignado en courier-service. */
-    @Column(name = "courier_id")
-    private Long courierId;
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "courier_id", length = 36)
+    private UUID courierId;
 
     @NotNull(message = "El cliente es obligatorio")
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

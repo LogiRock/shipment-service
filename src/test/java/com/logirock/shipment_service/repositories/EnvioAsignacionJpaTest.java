@@ -46,7 +46,7 @@ class EnvioAsignacionJpaTest {
         cliente.setTelefono("+5491100000000");
         cliente = clienteRepository.saveAndFlush(cliente);
 
-        Long courierId = 123L;
+        UUID courierId = UUID.randomUUID();
         Envio envio = crearEnvio("ENV-AAAA0001", courierId, cliente);
         envioRepository.saveAndFlush(envio);
         UUID envioId = envio.getId();
@@ -57,7 +57,7 @@ class EnvioAsignacionJpaTest {
         assertEquals(courierId, envioPersistido.getCourierId());
     }
 
-    private Envio crearEnvio(String codigo, Long courierId, Cliente cliente) {
+    private Envio crearEnvio(String codigo, UUID courierId, Cliente cliente) {
         Envio envio = new Envio();
         envio.setCodigoSeguimiento(codigo);
         envio.setPeso(2.0);
