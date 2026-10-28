@@ -14,9 +14,11 @@ import com.logirock.shipment_service.services.EnvioService;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
@@ -29,7 +31,13 @@ import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.*;
 
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class EnvioServiceImpl implements EnvioService {
@@ -41,19 +49,33 @@ public class EnvioServiceImpl implements EnvioService {
     private final RestTemplate restTemplate;
     @Value("${courier.service.url:http://localhost:8082}")
     private String courierUrl = "http://localhost:8082";
+    
+
+    // @Override
+    // public Envio crear(Envio envio, UUID clienteId) {
+
+    // Cliente cliente = buscarCliente(clienteId);
+
+    // envio.setCliente(cliente);
+    // envio.setEstado(EstadoEnvio.PENDIENTE);
+    // envio.setCodigoSeguimiento(generarCodigoSeguimiento());
+
+    // Envio envioGuardado = envioRepository.save(envio);
+
+    // return envioGuardado;
+    // }
 
     @Override
-    public Envio crear(Envio envio, UUID clienteId) {
+    @Transactional
+    public Envio crear(Envio envio, UUID userId) {
 
-        Cliente cliente = buscarCliente(clienteId);
+        Cliente cliente = clienteService.buscarPorUserId(userId);
 
         envio.setCliente(cliente);
         envio.setEstado(EstadoEnvio.PENDIENTE);
         envio.setCodigoSeguimiento(generarCodigoSeguimiento());
 
-        Envio envioGuardado = envioRepository.save(envio);
-
-        return envioGuardado;
+        return envioRepository.save(envio);
     }
 
     @Override
@@ -120,7 +142,7 @@ public class EnvioServiceImpl implements EnvioService {
     }
 
     @Override
-    public Envio asignarCourier(UUID envioId, UUID courierId) {
+    public Envio asignarCourier(UUID envioId, UUID courierId, String token) {
         Envio envio = envioRepository.findById(envioId)
                 .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún envío con el ID: " + envioId));
 
@@ -136,20 +158,36 @@ public class EnvioServiceImpl implements EnvioService {
 
         try {
             String url = courierUrl + "/api/v1/repartidores/" + courierId;
-            CourierDto courier = restTemplate.getForObject(url, CourierDto.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(token);
+
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+
+            ResponseEntity<CourierDto> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    request,
+                    CourierDto.class);
+
+            CourierDto courier = response.getBody();
 
             if (courier == null || !courierId.equals(courier.getId())) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "El repartidor no existe o la respuesta de courier-service no es válida.");
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "El repartidor no existe o la respuesta de courier-service no es válida.");
             }
             if (!"ACTIVO".equalsIgnoreCase(courier.getEstado())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El repartidor está INACTIVO; no se puede asignar el envío.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El repartidor está INACTIVO; no se puede asignar el envío.");
             }
         } catch (HttpClientErrorException.NotFound e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "El repartidor no existe en courier-service");
         } catch (ResourceAccessException e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "No se pudo conectar con courier-service; no se asignó el envío.");
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "No se pudo conectar con courier-service; no se asignó el envío.");
         } catch (HttpClientErrorException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "courier-service rechazó la consulta del repartidor.");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "courier-service rechazó la consulta del repartidor.");
         }
 
         envio.setCourierId(courierId);
@@ -172,6 +210,7 @@ public class EnvioServiceImpl implements EnvioService {
                 envio.getOrigen(),
                 envio.getDestino());
     }
+
     @Override
     public Envio cambiarEstado(UUID id, EstadoEnvio nuevoEstado) {
         Envio envio = buscarPorId(id);
@@ -256,6 +295,120 @@ public class EnvioServiceImpl implements EnvioService {
         } while (envioRepository.existsByCodigoSeguimiento(codigo));
 
         return codigo;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EnvioResponseDto> listarPorUsuario(UUID userId) {
+
+        Cliente cliente = clienteService.buscarPorUserId(userId);
+
+        return envioRepository.findByCliente_Id(cliente.getId())
+                .stream()
+                .map(this::mapearAResponseDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Envio buscarPorIdParaUsuario(UUID id, UUID userId) {
+
+        Envio envio = buscarPorId(id);
+
+        if (envio.getCliente() == null
+                || envio.getCliente().getUserId() == null
+                || !envio.getCliente().getUserId().equals(userId)) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "No tenés permiso para consultar este envío");
+        }
+
+        return envio;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Envio buscarPorCodigoParaUsuario(String codigo, UUID userId) {
+
+        Envio envio = buscarPorCodigoSeguimiento(codigo);
+
+        if (envio.getCliente() == null
+                || envio.getCliente().getUserId() == null
+                || !envio.getCliente().getUserId().equals(userId)) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "No tenés permiso para consultar este envío");
+        }
+
+        return envio;
+    }
+
+    private UUID obtenerCourierIdAutenticado(String token) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(token);
+
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+
+            ResponseEntity<CourierDto> response = restTemplate.exchange(
+                    courierUrl + "/api/v1/repartidores/me",
+                    HttpMethod.GET,
+                    request,
+                    CourierDto.class);
+
+            CourierDto courier = response.getBody();
+
+            if (courier == null || courier.getId() == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "No se pudo identificar al repartidor autenticado");
+            }
+
+            return courier.getId();
+
+        } catch (ResourceAccessException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "No se pudo conectar con courier-service");
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EnvioResponseDto> listarPorRepartidor(String token) {
+        UUID courierId = obtenerCourierIdAutenticado(token);
+
+        return envioRepository.findByCourierId(courierId)
+                .stream()
+                .map(this::mapearAResponseDto)
+                .toList();
+    }
+
+    @Override
+    public Envio cambiarEstadoParaRepartidor(
+            UUID envioId,
+            EstadoEnvio nuevoEstado,
+            String token) {
+
+        UUID courierId = obtenerCourierIdAutenticado(token);
+        Envio envio = buscarPorId(envioId);
+
+        if (envio.getCourierId() == null
+                || !envio.getCourierId().equals(courierId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "No tenés permiso para modificar un envío que no tenés asignado");
+        }
+
+        return cambiarEstado(envioId, nuevoEstado);
+    }
+
+    @Override
+    public Envio asignarCourier(UUID envioId, UUID courierId) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'asignarCourier'");
     }
 
 }

@@ -16,5 +16,9 @@ public interface EnvioRepository extends JpaRepository<Envio, UUID>{
     List<Envio> findByEstado(EstadoEnvio estado);
 
     boolean existsByCodigoSeguimiento(String codigoSeguimiento);
+
+    List<Envio> findByCliente_Id(UUID clienteId);
+
+    List<Envio> findByCourierId(UUID courierId);
     
 } 

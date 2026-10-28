@@ -27,7 +27,23 @@ public interface EnvioService {
     EnvioResponseDto cancelarEnvio(UUID id);
 
     Envio asignarCourier(UUID envioId, UUID courierId);
+
     Envio cambiarEstado(UUID id, EstadoEnvio nuevoEstado);
 
     List<HistorialEstadoEnvio> consultarHistorial(UUID envioId);
+
+    List<EnvioResponseDto> listarPorUsuario(UUID userId);
+
+    Envio buscarPorIdParaUsuario(UUID id, UUID userId);
+
+    Envio buscarPorCodigoParaUsuario(String codigo, UUID userId);
+
+    List<EnvioResponseDto> listarPorRepartidor(String token);
+
+    Envio cambiarEstadoParaRepartidor(
+            UUID envioId,
+            EstadoEnvio nuevoEstado,
+            String token);
+
+            Envio asignarCourier(UUID envioId, UUID courierId, String token);
 }

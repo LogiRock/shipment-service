@@ -13,4 +13,6 @@ public interface ClienteRepository extends JpaRepository<Cliente, UUID> {
     boolean existsByEmail(String email);
 
     boolean existsByTelefono(String telefono);
+
+    Optional<Cliente> findByUserId(UUID userId);
 }

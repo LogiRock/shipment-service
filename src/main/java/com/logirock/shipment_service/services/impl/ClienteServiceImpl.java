@@ -5,8 +5,12 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.logirock.shipment_service.clients.SecurityClient;
 import com.logirock.shipment_service.dto.ClienteRequestDto;
 import com.logirock.shipment_service.dto.ClienteResponseDto;
+import com.logirock.shipment_service.dto.RegistroClienteRequestDto;
+import com.logirock.shipment_service.dto.RegistroUsuarioRequest;
+import com.logirock.shipment_service.dto.UsuarioResponseDto;
 import com.logirock.shipment_service.models.Cliente;
 import com.logirock.shipment_service.repositories.ClienteRepository;
 import com.logirock.shipment_service.services.ClienteService;
@@ -19,25 +23,28 @@ import lombok.RequiredArgsConstructor;
 public class ClienteServiceImpl implements ClienteService {
 
     private final ClienteRepository clienteRepository;
+    private final SecurityClient securityClient;
 
-    @Override
-    @Transactional
-    public ClienteResponseDto registrarCliente(ClienteRequestDto request) {
-        if (clienteRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("El email ingresado ya se encuentra registrado.");
-        }
-        if (clienteRepository.existsByTelefono(request.getTelefono())) {
-            throw new IllegalArgumentException("El teléfono ingresado ya se encuentra registrado.");
-        }
+    // @Override
+    // @Transactional
+    // public ClienteResponseDto registrarCliente(ClienteRequestDto request) {
+    // if (clienteRepository.existsByEmail(request.getEmail())) {
+    // throw new IllegalArgumentException("El email ingresado ya se encuentra
+    // registrado.");
+    // }
+    // if (clienteRepository.existsByTelefono(request.getTelefono())) {
+    // throw new IllegalArgumentException("El teléfono ingresado ya se encuentra
+    // registrado.");
+    // }
 
-        Cliente cliente = new Cliente();
-        cliente.setNombre(request.getNombre());
-        cliente.setEmail(request.getEmail());
-        cliente.setTelefono(request.getTelefono());
+    // Cliente cliente = new Cliente();
+    // cliente.setNombre(request.getNombre());
+    // cliente.setEmail(request.getEmail());
+    // cliente.setTelefono(request.getTelefono());
 
-        cliente = clienteRepository.save(cliente);
-        return mapearAResponseDto(cliente);
-    }
+    // cliente = clienteRepository.save(cliente);
+    // return mapearAResponseDto(cliente);
+    // }
 
     @Override
     @Transactional(readOnly = true)
@@ -90,5 +97,46 @@ public class ClienteServiceImpl implements ClienteService {
     @Transactional(readOnly = true)
     public Cliente buscarEntidadPorId(UUID id) {
         return buscarClientePorId(id);
+    }
+
+    @Override
+    @Transactional
+    public ClienteResponseDto registrarCliente(RegistroClienteRequestDto request) {
+
+        if (clienteRepository.existsByEmail(request.getEmail())) {
+            throw new IllegalArgumentException(
+                    "El email ingresado ya se encuentra registrado.");
+        }
+
+        if (clienteRepository.existsByTelefono(request.getTelefono())) {
+            throw new IllegalArgumentException(
+                    "El teléfono ingresado ya se encuentra registrado.");
+        }
+
+        // 1. Crear la cuenta en security-service
+        UsuarioResponseDto usuario = securityClient.registrarUsuario(
+                new RegistroUsuarioRequest(
+                        request.getUsername(),
+                        request.getPassword()));
+
+        // 2. Crear el perfil del cliente y asociarlo a la cuenta
+        Cliente cliente = new Cliente();
+        cliente.setNombre(request.getNombre());
+        cliente.setEmail(request.getEmail());
+        cliente.setTelefono(request.getTelefono());
+        cliente.setUserId(usuario.id());
+
+        // 3. Guardar el perfil
+        cliente = clienteRepository.save(cliente);
+
+        return mapearAResponseDto(cliente);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Cliente buscarPorUserId(UUID userId) {
+        return clienteRepository.findByUserId(userId)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "No se encontró un cliente asociado al usuario: " + userId));
     }
 }

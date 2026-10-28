@@ -37,4 +37,7 @@ public class Cliente extends Auditable {
     @NotBlank(message = "El teléfono es obligatorio")
     @Column(nullable = false, length = 20)
     private String telefono;
+
+    @Column(name = "user_id", unique = true)
+    private UUID userId;
 }

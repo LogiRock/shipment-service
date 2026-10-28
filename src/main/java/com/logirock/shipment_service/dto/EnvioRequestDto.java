@@ -52,8 +52,8 @@ public class EnvioRequestDto {
     @NotNull(message = "La dirección de destino es obligatoria")
     private Direccion destino;
 
-    @Schema(description = "UUID de un cliente existente", example = "2e0d43cc-4fa3-4dc8-9b0d-67f57bb3b001", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "El cliente es obligatorio")
-    private UUID clienteId;
+    // @Schema(description = "UUID de un cliente existente", example = "2e0d43cc-4fa3-4dc8-9b0d-67f57bb3b001", requiredMode = Schema.RequiredMode.REQUIRED)
+    // @NotNull(message = "El cliente es obligatorio")
+    // private UUID clienteId;
 
 }

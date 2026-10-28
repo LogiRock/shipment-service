@@ -42,24 +42,24 @@ class ClienteServiceImplTest {
     }
 
 
-    @Test
-    void registrarClienteDebeRetornarCliente_CuandoDatosSonValidos() {
-        when(clienteRepository.existsByEmail(anyString())).thenReturn(false);
-        when(clienteRepository.existsByTelefono(anyString())).thenReturn(false);
-        when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteGuardado);
-        ClienteResponseDto response = clienteService.registrarCliente(requestDto);
-        assertNotNull(response);
-        assertEquals(requestDto.getEmail(), response.getEmail());
-        verify(clienteRepository, times(1)).save(any(Cliente.class)); // Verificamos que se llamó al save
-    }
+//     @Test
+//     void registrarClienteDebeRetornarCliente_CuandoDatosSonValidos() {
+//         when(clienteRepository.existsByEmail(anyString())).thenReturn(false);
+//         when(clienteRepository.existsByTelefono(anyString())).thenReturn(false);
+//         when(clienteRepository.save(any(Cliente.class))).thenReturn(clienteGuardado);
+//         ClienteResponseDto response = clienteService.registrarCliente(requestDto);
+//         assertNotNull(response);
+//         assertEquals(requestDto.getEmail(), response.getEmail());
+//         verify(clienteRepository, times(1)).save(any(Cliente.class)); // Verificamos que se llamó al save
+//     }
 
-    @Test
-    void registrarClienteDebeLanzarExcepcion_CuandoEmailYaExiste() {
-        when(clienteRepository.existsByEmail(anyString())).thenReturn(true);
-IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            clienteService.registrarCliente(requestDto);
-        });
-        assertEquals("El email ingresado ya se encuentra registrado.", exception.getMessage());
-        verify(clienteRepository, never()).save(any(Cliente.class)); // Verificamos que JAMÁS intentó guardar
-    }
+//     @Test
+//     void registrarClienteDebeLanzarExcepcion_CuandoEmailYaExiste() {
+//         when(clienteRepository.existsByEmail(anyString())).thenReturn(true);
+// IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+//             clienteService.registrarCliente(requestDto);
+//         });
+//         assertEquals("El email ingresado ya se encuentra registrado.", exception.getMessage());
+//         verify(clienteRepository, never()).save(any(Cliente.class)); // Verificamos que JAMÁS intentó guardar
+//     }
 }

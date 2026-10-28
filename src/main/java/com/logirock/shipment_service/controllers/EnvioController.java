@@ -22,9 +22,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -47,7 +51,10 @@ public class EnvioController {
                         @ApiResponse(responseCode = "500", description = "No fue posible guardar el envío", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
         })
         public EnvioResponseDto crear(
-                        @Valid @RequestBody EnvioRequestDto request) {
+                        @Valid @RequestBody EnvioRequestDto request,
+                        @AuthenticationPrincipal Jwt jwt) {
+
+                UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
 
                 Envio envio = new Envio();
 
@@ -58,7 +65,9 @@ public class EnvioController {
                 envio.setOrigen(request.getOrigen());
                 envio.setDestino(request.getDestino());
 
-                Envio creado = envioService.crear(envio, request.getClienteId());
+                // Envio creado = envioService.crear(envio, request.getClienteId());
+
+                Envio creado = envioService.crear(envio, userId);
 
                 return convertirAResponse(creado);
         }
@@ -66,19 +75,63 @@ public class EnvioController {
         @GetMapping
         @Operation(summary = "Listar envíos")
         @ApiResponse(responseCode = "200", description = "Listado de envíos")
-        public List<EnvioResponseDto> listarTodos() {
-                return envioService.listarTodos();
+        public List<EnvioResponseDto> listarTodos(
+                        @AuthenticationPrincipal Jwt jwt) {
+
+                List<String> roles = jwt.getClaimAsStringList("roles");
+                String userIdClaim = jwt.getClaimAsString("userId");
+
+                if (roles.contains("ROLE_ADMIN")) {
+                        return envioService.listarTodos();
+                }
+
+                UUID userId = UUID.fromString(userIdClaim);
+
+                if (roles.contains("ROLE_CLIENTE")) {
+                        return envioService.listarPorUsuario(userId);
+                }
+
+                if (roles.contains("ROLE_REPARTIDOR")) {
+                        return envioService.listarPorRepartidor(jwt.getTokenValue());
+                }
+
+                throw new ResponseStatusException(
+                                HttpStatus.FORBIDDEN,
+                                "No tenés permisos para consultar estos envíos");
         }
 
         @GetMapping("/{id}")
-        @Operation(summary = "Consultar envío por UUID")
+        @Operation(summary = "Consultar envío por UUID según el rol")
         @ApiResponses({
                         @ApiResponse(responseCode = "200", description = "Envío encontrado"),
                         @ApiResponse(responseCode = "404", description = "Envío inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
         })
         public EnvioResponseDto buscarPorId(
-                        @Parameter(description = "UUID del envío", required = true) @PathVariable UUID id) {
-                return convertirAResponse(envioService.buscarPorId(id));
+                        @Parameter(description = "UUID del envío", required = true) @PathVariable UUID id,
+                        @AuthenticationPrincipal Jwt jwt) {
+
+                List<String> roles = jwt.getClaimAsStringList("roles");
+
+                Envio envio;
+
+                if (roles != null && roles.contains("ROLE_ADMIN")) {
+
+                        envio = envioService.buscarPorId(id);
+
+                } else if (roles != null && roles.contains("ROLE_CLIENTE")) {
+
+                        UUID userId = UUID.fromString(
+                                        jwt.getClaimAsString("userId"));
+
+                        envio = envioService.buscarPorIdParaUsuario(id, userId);
+
+                } else {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "No tenés permisos para consultar este envío");
+                }
+
+                return convertirAResponse(envio);
         }
 
         @GetMapping("/seguimiento/{codigo}")
@@ -88,9 +141,30 @@ public class EnvioController {
                         @ApiResponse(responseCode = "404", description = "No existe un envío con ese código", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
         })
         public EnvioResponseDto buscarPorCodigoSeguimiento(
-                        @Parameter(description = "Código de seguimiento generado para el envío", example = "ENV-A1B2C3D4", required = true) @PathVariable String codigo) {
-                return convertirAResponse(
-                                envioService.buscarPorCodigoSeguimiento(codigo));
+                        @Parameter(description = "Código de seguimiento generado para el envío", example = "ENV-A1B2C3D4", required = true) @PathVariable String codigo,
+                        @AuthenticationPrincipal Jwt jwt) {
+                List<String> roles = jwt.getClaimAsStringList("roles");
+
+                Envio envio;
+
+                if (roles != null && roles.contains("ROLE_ADMIN")) {
+
+                        envio = envioService.buscarPorCodigoSeguimiento(codigo);
+
+                } else if (roles != null && roles.contains("ROLE_CLIENTE")) {
+
+                        UUID userId = UUID.fromString(
+                                        jwt.getClaimAsString("userId"));
+
+                        envio = envioService.buscarPorCodigoParaUsuario(codigo, userId);
+
+                } else {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "No tenés permisos para consultar este envío");
+                }
+
+                return convertirAResponse(envio);
         }
 
         @PutMapping("/{id}")
@@ -113,7 +187,7 @@ public class EnvioController {
                 datos.setDestino(request.getDestino());
 
                 Cliente cliente = new Cliente();
-                cliente.setId(request.getClienteId());
+                ///cliente.setId(request.getClienteId());
                 datos.setCliente(cliente);
 
                 return convertirAResponse(envioService.actualizar(id, datos));
@@ -185,8 +259,9 @@ public class EnvioController {
         })
         public ResponseEntity<EnvioResponseDto> asignarCourier(
                         @Parameter(description = "UUID del envío", required = true) @PathVariable UUID envioId,
-                        @Parameter(description = "UUID del courier", required = true) @PathVariable UUID courierId) {
-                Envio envio = envioService.asignarCourier(envioId, courierId);
+                        @Parameter(description = "UUID del courier", required = true) @PathVariable UUID courierId,
+                @AuthenticationPrincipal Jwt jwt) {
+                Envio envio = envioService.asignarCourier(envioId, courierId, jwt.getTokenValue());
                 return ResponseEntity.ok(convertirAResponse(envio));
         }
 
@@ -200,10 +275,28 @@ public class EnvioController {
         })
         public EnvioResponseDto cambiarEstado(
                         @Parameter(description = "UUID del envío", required = true) @PathVariable UUID id,
-                        @Valid @RequestBody EstadoEnvioRequestDto request) {
+                        @Valid @RequestBody EstadoEnvioRequestDto request,
+                        @AuthenticationPrincipal Jwt jwt) {
+                List<String> roles = jwt.getClaimAsStringList("roles");
 
-                return convertirAResponse(
-                                envioService.cambiarEstado(id, request.getEstado()));
+                Envio envio;
+
+                if (roles.contains("ROLE_ADMIN")) {
+                        envio = envioService.cambiarEstado(id, request.getEstado());
+
+                } else if (roles.contains("ROLE_REPARTIDOR")) {
+                        envio = envioService.cambiarEstadoParaRepartidor(
+                                        id,
+                                        request.getEstado(),
+                                        jwt.getTokenValue());
+
+                } else {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "No tenés permisos para cambiar el estado del envío");
+                }
+
+                return convertirAResponse(envio);
         }
 
         @GetMapping("/{id}/historial")
