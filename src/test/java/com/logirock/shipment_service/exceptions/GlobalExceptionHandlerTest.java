@@ -2,10 +2,7 @@ package com.logirock.shipment_service.exceptions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-
-import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,7 +12,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
@@ -62,19 +61,19 @@ class GlobalExceptionHandlerTest {
     }
 
     /**
-     * Verifica que una IllegalArgumentException genere una respuesta con estado HTTP 409 Conflict.
+     * Verifica que una IllegalArgumentException genere una respuesta con estado HTTP 400.
      */
     @Test
-    void deberiaRetornarConflict_CuandoLanzaIllegalArgumentException() {
+    void deberiaRetornarBadRequest_CuandoLanzaIllegalArgumentException() {
         IllegalArgumentException excepcion = new IllegalArgumentException("El email ya existe");
         when(webRequest.getDescription(false)).thenReturn("uri=/api/v1/clientes");
 
         ResponseEntity<ErrorResponseDto> respuesta = globalExceptionHandler.handleIllegalArgumentException(excepcion, webRequest);
 
         assertNotNull(respuesta);
-        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
         assertNotNull(respuesta.getBody());
-        assertEquals(409, respuesta.getBody().getStatus());
+        assertEquals(400, respuesta.getBody().getStatus());
         assertEquals("El email ya existe", respuesta.getBody().getMessage());
     }
 
@@ -82,7 +81,7 @@ class GlobalExceptionHandlerTest {
     void deberiaConservarElEstadoHttp_CuandoLanzaResponseStatusException() {
         ResponseStatusException excepcion = new ResponseStatusException(
                 HttpStatus.CONFLICT, "Transición de estado no permitida");
-        when(webRequest.getDescription(false)).thenReturn("uri=/api/envios/1/estado");
+        when(webRequest.getDescription(false)).thenReturn("uri=/api/v1/envios/1/estado");
 
         ResponseEntity<ErrorResponseDto> respuesta = globalExceptionHandler
                 .handleResponseStatusException(excepcion, webRequest);
@@ -93,15 +92,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void deberiaRetornarConflict_CuandoLanzaIllegalStateException() {
+    void deberiaRetornarBadRequest_CuandoLanzaIllegalStateException() {
         IllegalStateException excepcion = new IllegalStateException("El estado actual no permite la operación");
-        when(webRequest.getDescription(false)).thenReturn("uri=/api/envios/1/cancelacion");
+        when(webRequest.getDescription(false)).thenReturn("uri=/api/v1/envios/1/cancelacion");
 
         ResponseEntity<ErrorResponseDto> respuesta = globalExceptionHandler
                 .handleIllegalArgumentException(excepcion, webRequest);
 
-        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
-        assertEquals(409, respuesta.getBody().getStatus());
+        assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode());
+        assertEquals(400, respuesta.getBody().getStatus());
         assertEquals("El estado actual no permite la operación", respuesta.getBody().getMessage());
     }
 
@@ -110,13 +109,15 @@ class GlobalExceptionHandlerTest {
      * y genere una respuesta con estado HTTP 400 Bad Request.
      */
     @Test
-    void deberiaRetornarBadRequest_CuandoLanzaMethodArgumentNotValidException() {
-        MethodArgumentNotValidException excepcionSimulada = mock(MethodArgumentNotValidException.class);
-        BindingResult resultadoSimulado = mock(BindingResult.class);
+    void deberiaRetornarBadRequest_CuandoLanzaMethodArgumentNotValidException() throws NoSuchMethodException {
+        BindingResult resultadoSimulado = new BeanPropertyBindingResult(new Object(), "cliente");
         FieldError errorCampo = new FieldError("cliente", "email", "El formato no es válido");
+        resultadoSimulado.addError(errorCampo);
+        MethodParameter parametro = new MethodParameter(
+                getClass().getDeclaredMethod("metodoDePrueba", String.class), 0);
+        MethodArgumentNotValidException excepcionSimulada =
+                new MethodArgumentNotValidException(parametro, resultadoSimulado);
 
-        when(excepcionSimulada.getBindingResult()).thenReturn(resultadoSimulado);
-        when(resultadoSimulado.getFieldErrors()).thenReturn(List.of(errorCampo));
         when(webRequest.getDescription(false)).thenReturn("uri=/api/v1/clientes");
 
         ResponseEntity<ErrorResponseDto> respuesta = globalExceptionHandler.handleValidationExceptions(excepcionSimulada, webRequest);
@@ -126,5 +127,8 @@ class GlobalExceptionHandlerTest {
         assertNotNull(respuesta.getBody());
         assertEquals(400, respuesta.getBody().getStatus());
         assertEquals("Error en la validación de los datos enviados.", respuesta.getBody().getMessage());
+    }
+
+    private void metodoDePrueba(String email) {
     }
 }

@@ -1,49 +1,44 @@
 package com.logirock.shipment_service.services;
 
+import com.logirock.shipment_service.dto.EnvioRequestDto;
 import com.logirock.shipment_service.dto.EnvioResponseDto;
+import com.logirock.shipment_service.dto.HistorialEstadoEnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
-import com.logirock.shipment_service.models.Envio;
-import com.logirock.shipment_service.models.HistorialEstadoEnvio;
 
 import java.util.List;
 import java.util.UUID;
 
 public interface EnvioService {
 
-    Envio crear(Envio envio, UUID clienteId);
+    EnvioResponseDto crear(EnvioRequestDto peticion, UUID userId);
 
     List<EnvioResponseDto> listarTodos();
 
-    List<Envio> findByEstado(EstadoEnvio estado);
+    List<EnvioResponseDto> findByEstado(EstadoEnvio estado);
 
-    Envio buscarPorId(UUID id);
+    EnvioResponseDto buscarPorId(UUID id);
 
-    Envio buscarPorCodigoSeguimiento(String codigoSeguimiento);
+    EnvioResponseDto buscarPorCodigoSeguimiento(String codigoSeguimiento);
 
-    Envio actualizar(UUID id, Envio datos);
+    EnvioResponseDto actualizar(UUID id, EnvioRequestDto datos);
 
     void eliminar(UUID id);
 
     EnvioResponseDto cancelarEnvio(UUID id);
 
-    Envio asignarCourier(UUID envioId, UUID courierId);
+    EnvioResponseDto asignarCourier(UUID envioId, UUID courierId, String token);
 
-    Envio cambiarEstado(UUID id, EstadoEnvio nuevoEstado);
+    EnvioResponseDto cambiarEstado(UUID id, EstadoEnvio nuevoEstado);
 
-    List<HistorialEstadoEnvio> consultarHistorial(UUID envioId);
+    List<HistorialEstadoEnvioResponseDto> consultarHistorial(UUID envioId);
 
     List<EnvioResponseDto> listarPorUsuario(UUID userId);
 
-    Envio buscarPorIdParaUsuario(UUID id, UUID userId);
+    EnvioResponseDto buscarPorIdParaUsuario(UUID id, UUID userId);
 
-    Envio buscarPorCodigoParaUsuario(String codigo, UUID userId);
+    EnvioResponseDto buscarPorCodigoParaUsuario(String codigo, UUID userId);
 
     List<EnvioResponseDto> listarPorRepartidor(String token);
 
-    Envio cambiarEstadoParaRepartidor(
-            UUID envioId,
-            EstadoEnvio nuevoEstado,
-            String token);
-
-            Envio asignarCourier(UUID envioId, UUID courierId, String token);
+    EnvioResponseDto cambiarEstadoParaRepartidor(UUID envioId, EstadoEnvio nuevoEstado, String token);
 }

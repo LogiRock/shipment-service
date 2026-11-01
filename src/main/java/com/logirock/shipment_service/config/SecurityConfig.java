@@ -47,21 +47,21 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/v1/clientes")
                         .permitAll()
-                        .requestMatchers(HttpMethod.PUT, "/api/envios/**")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/envios/**")
                         .hasAuthority("ROLE_ADMIN")
 
-                        .requestMatchers(HttpMethod.DELETE, "/api/envios/**")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/envios/**")
                         .hasAuthority("ROLE_ADMIN")
 
-                        .requestMatchers(HttpMethod.GET, "/api/envios/estado/**")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/envios/estado/**")
                         .hasAuthority("ROLE_ADMIN")
 
-                        .requestMatchers(HttpMethod.POST, "/api/envios/*/cancelacion")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/envios/*/cancelacion")
                         .hasAuthority("ROLE_ADMIN")
 
                         // Cambios de estado: ADMIN o REPARTIDOR.
                         // El servicio deberá validar la asignación y la transición.
-                        .requestMatchers(HttpMethod.PATCH, "/api/envios/*/estado")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/envios/*/estado")
                         .hasAnyAuthority("ROLE_ADMIN", "ROLE_REPARTIDOR")
 
                         .anyRequest().authenticated())

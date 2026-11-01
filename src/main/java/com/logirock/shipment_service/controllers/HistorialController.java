@@ -19,7 +19,7 @@ import com.logirock.shipment_service.repositories.HistorialEstadoEnvioRepository
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/historial")
+@RequestMapping("/api/v1/historial")
 @RequiredArgsConstructor
 @Tag(name = "Historial", description = "Consulta global del historial de cambios de estado")
 public class HistorialController {
@@ -33,6 +33,7 @@ public class HistorialController {
             @ApiResponse(responseCode = "500", description = "No fue posible consultar el historial", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
     })
     public List<HistorialEstadoEnvio> listarTodos() {
+
         return historialEstadoEnvioRepository.findAll();
     }
 }

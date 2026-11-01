@@ -99,21 +99,21 @@ Crear cliente:
 
 Nombre, email y teléfono son obligatorios; el email debe tener formato válido. El email y el teléfono deben ser únicos. Una solicitud inválida responde `400`, una duplicada `409` y un UUID inexistente `404`.
 
-### Envíos — `/api/envios`
+### Envíos — `/api/v1/envios`
 
 | Método | Ruta | Resultado principal |
 | --- | --- | --- |
-| `POST` | `/api/envios` | Crea un envío en estado `PENDIENTE` y genera su código de seguimiento (`201`). |
-| `GET` | `/api/envios` | Lista envíos como DTOs (`200`). |
-| `GET` | `/api/envios/{id}` | Consulta por UUID (`200`, o `404` si no existe). |
-| `GET` | `/api/envios/seguimiento/{codigo}` | Consulta por código de seguimiento (`200`, o `404`). |
-| `GET` | `/api/envios/estado/{estado}` | Filtra por estado (`200`; `400` si el estado no es válido). |
-| `PUT` | `/api/envios/{id}` | Actualiza peso, dimensiones, direcciones y cliente (`200`). |
-| `DELETE` | `/api/envios/{id}` | Elimina físicamente el envío (`204`). |
-| `PUT` | `/api/envios/{envioId}/courier/{courierId}` | Asigna el ID lógico de un courier (`200`). |
-| `POST` | `/api/envios/{id}/cancelacion` | Cancela un envío pendiente (`200`). |
-| `PATCH` | `/api/envios/{id}/estado` | Cambia el estado según el ciclo de vida (`200`). |
-| `GET` | `/api/envios/{id}/historial` | Consulta los cambios de estado de un envío (`200`). |
+| `POST` | `/api/v1/envios` | Crea un envío en estado `PENDIENTE` y genera su código de seguimiento (`201`). |
+| `GET` | `/api/v1/envios` | Lista envíos como DTOs (`200`). |
+| `GET` | `/api/v1/envios/{id}` | Consulta por UUID (`200`, o `404` si no existe). |
+| `GET` | `/api/v1/envios/seguimiento/{codigo}` | Consulta por código de seguimiento (`200`, o `404`). |
+| `GET` | `/api/v1/envios/estado/{estado}` | Filtra por estado (`200`; `400` si el estado no es válido). |
+| `PUT` | `/api/v1/envios/{id}` | Actualiza peso, dimensiones y direcciones (`200`). |
+| `DELETE` | `/api/v1/envios/{id}` | Elimina físicamente el envío (`204`). |
+| `PUT` | `/api/v1/envios/{envioId}/courier/{courierId}` | Asigna el ID lógico de un courier (`200`). |
+| `POST` | `/api/v1/envios/{id}/cancelacion` | Cancela un envío pendiente (`200`). |
+| `PATCH` | `/api/v1/envios/{id}/estado` | Cambia el estado según el ciclo de vida (`200`). |
+| `GET` | `/api/v1/envios/{id}/historial` | Consulta los cambios de estado de un envío (`200`). |
 
 Crear o actualizar envío:
 
@@ -145,11 +145,11 @@ La respuesta de envío contiene `id`, `codigoSeguimiento`, dimensiones, `estado`
 
 #### Asignar un courier
 
-Ejemplo: `PUT /api/envios/9b715c47-1a23-4b70-a146-fbf0ff47b001/courier/1b6e8c5a-64f9-4e2a-ae1e-4e5da04533fd`. No requiere cuerpo. Shipment Service consulta `GET /api/v1/repartidores/{id}` en Courier Service y solo asigna el UUID si el courier existe y está `ACTIVO`. El envío debe estar `PENDIENTE` y no puede cambiar a otro courier una vez asignado. Si no existe responde `404`, si está inactivo `400`, y si Courier Service no está disponible `503`; en todos esos casos no se persiste la asignación.
+Ejemplo: `PUT /api/v1/envios/9b715c47-1a23-4b70-a146-fbf0ff47b001/courier/1b6e8c5a-64f9-4e2a-ae1e-4e5da04533fd`. No requiere cuerpo. Shipment Service consulta `GET /api/v1/repartidores/{id}` en Courier Service y solo asigna el UUID si el courier existe y está `ACTIVO`. El envío debe estar `PENDIENTE` y no puede cambiar a otro courier una vez asignado. Si no existe responde `404`, si está inactivo `400`, y si Courier Service no está disponible `503`; en todos esos casos no se persiste la asignación.
 
 #### Cambiar el estado
 
-`PATCH /api/envios/{id}/estado` recibe:
+`PATCH /api/v1/envios/{id}/estado` recibe:
 
 ```json
 {
@@ -165,15 +165,15 @@ Transiciones admitidas:
 | `PENDIENTE` | `CANCELADO` | No requiere courier. |
 | `EN_RUTA` | `ENTREGADO` | El envío debe estar en ruta. |
 
-Las demás transiciones responden `409`. El cambio se persiste y se agrega al historial. La operación `POST /api/envios/{id}/cancelacion` aplica la misma regla que `PENDIENTE → CANCELADO`.
+Las demás transiciones responden `409`. El cambio se persiste y se agrega al historial. La operación `POST /api/v1/envios/{id}/cancelacion` aplica la misma regla que `PENDIENTE → CANCELADO`.
 
 El historial individual devuelve los registros del envío ordenados del más reciente al más antiguo. Un envío recién creado todavía no tiene registros: se guarda cada transición posterior.
 
-### Historial global — `/api/historial`
+### Historial global — `/api/v1/historial`
 
 | Método | Ruta | Resultado principal |
 | --- | --- | --- |
-| `GET` | `/api/historial` | Lista los registros de historial de todos los envíos (`200`). |
+| `GET` | `/api/v1/historial` | Lista los registros de historial de todos los envíos (`200`). |
 
 ## Errores
 

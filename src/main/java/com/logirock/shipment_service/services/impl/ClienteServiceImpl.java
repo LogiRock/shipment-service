@@ -25,27 +25,6 @@ public class ClienteServiceImpl implements ClienteService {
     private final ClienteRepository clienteRepository;
     private final SecurityClient securityClient;
 
-    // @Override
-    // @Transactional
-    // public ClienteResponseDto registrarCliente(ClienteRequestDto request) {
-    // if (clienteRepository.existsByEmail(request.getEmail())) {
-    // throw new IllegalArgumentException("El email ingresado ya se encuentra
-    // registrado.");
-    // }
-    // if (clienteRepository.existsByTelefono(request.getTelefono())) {
-    // throw new IllegalArgumentException("El teléfono ingresado ya se encuentra
-    // registrado.");
-    // }
-
-    // Cliente cliente = new Cliente();
-    // cliente.setNombre(request.getNombre());
-    // cliente.setEmail(request.getEmail());
-    // cliente.setTelefono(request.getTelefono());
-
-    // cliente = clienteRepository.save(cliente);
-    // return mapearAResponseDto(cliente);
-    // }
-
     @Override
     @Transactional(readOnly = true)
     public ClienteResponseDto obtenerCliente(UUID id) {
@@ -58,8 +37,6 @@ public class ClienteServiceImpl implements ClienteService {
     public ClienteResponseDto modificarCliente(UUID id, ClienteRequestDto request) {
         Cliente cliente = buscarClientePorId(id);
 
-        // Validar si quiere cambiar el email y si el nuevo ya está en uso por otro
-        // usuario
         if (!cliente.getEmail().equals(request.getEmail()) && clienteRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("El nuevo email ya se encuentra registrado por otro cliente.");
         }
@@ -79,7 +56,6 @@ public class ClienteServiceImpl implements ClienteService {
         clienteRepository.delete(cliente);
     }
 
-    // Métodos privados auxiliares para no repetir código
     private Cliente buscarClientePorId(UUID id) {
         return clienteRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("No se encontró ningún cliente con el ID: " + id));
@@ -113,20 +89,17 @@ public class ClienteServiceImpl implements ClienteService {
                     "El teléfono ingresado ya se encuentra registrado.");
         }
 
-        // 1. Crear la cuenta en security-service
         UsuarioResponseDto usuario = securityClient.registrarUsuario(
                 new RegistroUsuarioRequest(
                         request.getUsername(),
                         request.getPassword()));
 
-        // 2. Crear el perfil del cliente y asociarlo a la cuenta
         Cliente cliente = new Cliente();
         cliente.setNombre(request.getNombre());
         cliente.setEmail(request.getEmail());
         cliente.setTelefono(request.getTelefono());
         cliente.setUserId(usuario.id());
 
-        // 3. Guardar el perfil
         cliente = clienteRepository.save(cliente);
 
         return mapearAResponseDto(cliente);

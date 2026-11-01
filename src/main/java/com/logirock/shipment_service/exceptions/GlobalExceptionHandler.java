@@ -18,17 +18,10 @@ import com.logirock.shipment_service.dto.ErrorResponseDto;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Interceptor global de excepciones para centralizar el manejo de errores en todos los controladores.
- * Utiliza SLF4J para registrar las trazas de error de manera interna sin exponerlas al cliente.
- */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * Captura excepciones de recursos no encontrados y retorna HTTP 404.
-     */
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<ErrorResponseDto> handleEntityNotFoundException(EntityNotFoundException ex, WebRequest request) {
         log.warn("Recurso no encontrado: {}", ex.getMessage());
@@ -44,9 +37,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
-    /**
-     * Captura excepciones de validación de campos provenientes de jakarta.validation y retorna HTTP 400.
-     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponseDto> handleValidationExceptions(MethodArgumentNotValidException ex, WebRequest request) {
         List<String> errors = ex.getBindingResult()
@@ -69,27 +59,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
-    /**
-     * Captura excepciones de reglas de negocio y conflictos de datos retornando HTTP 409.
-     */
-    @ExceptionHandler({ IllegalArgumentException.class, IllegalStateException.class })
-    public ResponseEntity<ErrorResponseDto> handleIllegalArgumentException(RuntimeException ex, WebRequest request) {
-        log.warn("Conflicto de regla de negocio: {}", ex.getMessage());
-
-        ErrorResponseDto errorResponse = ErrorResponseDto.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.CONFLICT.value())
-                .error(HttpStatus.CONFLICT.getReasonPhrase())
-                .message(ex.getMessage())
-                .path(request.getDescription(false).replace("uri=", ""))
-                .build();
-
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+    // Nuevo handler: EnvioNoEncontradoException -> 404
+    @ExceptionHandler(EnvioNoEncontradoException.class)
+    public ResponseEntity<ErrorResponseDto> handleEnvioNoEncontradoException(EnvioNoEncontradoException ex, WebRequest request) {
+        log.warn("Envío no encontrado: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
-    /**
-     * Conserva el código HTTP y el motivo definido por los servicios en sus reglas de negocio.
-     */
+    // Nuevo handler: TransicionInvalidaException -> 409
+    @ExceptionHandler(TransicionInvalidaException.class)
+    public ResponseEntity<ErrorResponseDto> handleTransicionInvalidaException(TransicionInvalidaException ex, WebRequest request) {
+        log.warn("Transición de estado inválida: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
+
+    // Modificado: IllegalArgumentException / IllegalStateException ahora devuelven 400 (Bad Request)
+    @ExceptionHandler({ IllegalArgumentException.class, IllegalStateException.class })
+    public ResponseEntity<ErrorResponseDto> handleIllegalArgumentException(RuntimeException ex, WebRequest request) {
+        log.warn("Error en los argumentos o estado de la petición: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponseDto> handleResponseStatusException(ResponseStatusException ex, WebRequest request) {
         HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
@@ -106,9 +96,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatusCode()).body(errorResponse);
     }
 
-    /**
-     * Informa como HTTP 400 los UUID o valores de enum que no pueden convertirse desde la ruta.
-     */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponseDto> handleArgumentTypeMismatch(MethodArgumentTypeMismatchException ex, WebRequest request) {
         String message = "El parámetro '" + ex.getName() + "' tiene un formato o valor inválido.";
@@ -123,9 +110,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorResponse);
     }
 
-    /**
-     * Captura cualquier otra excepción no controlada para evitar exponer detalles internos, retornando HTTP 500.
-     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDto> handleGlobalException(Exception ex, WebRequest request) {
         log.error("Excepción interna no controlada capturada en la ruta {}", request.getDescription(false), ex);
@@ -139,5 +123,17 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+
+    // Método auxiliar para no repetir código del builder
+    private ResponseEntity<ErrorResponseDto> buildErrorResponse(HttpStatus status, String message, WebRequest request) {
+        ErrorResponseDto errorResponse = ErrorResponseDto.builder()
+                .timestamp(LocalDateTime.now())
+                .status(status.value())
+                .error(status.getReasonPhrase())
+                .message(message)
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+        return ResponseEntity.status(status).body(errorResponse);
     }
 }

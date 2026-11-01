@@ -1,9 +1,3 @@
-CREATE DATABASE IF NOT EXISTS logitrack_db
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-USE logitrack_db;
-
 CREATE TABLE IF NOT EXISTS clientes (
     id BINARY(16) NOT NULL,
     nombre VARCHAR(100) NOT NULL,
@@ -55,57 +49,6 @@ CREATE TABLE IF NOT EXISTS envios (
         REFERENCES clientes(id)
 );
 
--- Migra instalaciones existentes que todavía tenían la relación local con repartidores.
--- Elimina la relación física con la tabla local de repartidores; courier-service es dueño de esos datos.
-SET @drop_repartidores_fk = (
-    SELECT IF(COUNT(*) > 0,
-        'ALTER TABLE envios DROP FOREIGN KEY fk_envios_repartidores',
-        'SELECT 1')
-    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-    WHERE CONSTRAINT_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'envios'
-      AND CONSTRAINT_NAME = 'fk_envios_repartidores'
-);
-PREPARE migration_stmt FROM @drop_repartidores_fk;
-EXECUTE migration_stmt;
-DEALLOCATE PREPARE migration_stmt;
-
-SET @add_courier_id = (
-    SELECT IF(COUNT(*) = 0,
-        'ALTER TABLE envios ADD COLUMN courier_id VARCHAR(36) NULL',
-        'SELECT 1')
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'envios'
-      AND COLUMN_NAME = 'courier_id'
-);
-PREPARE migration_stmt FROM @add_courier_id;
-EXECUTE migration_stmt;
-DEALLOCATE PREPARE migration_stmt;
-
--- courier-service identifica repartidores con UUID. Las asignaciones numéricas previas no
--- pueden convertirse a UUID sin consultar courier-service, por eso se limpian antes del cambio.
-UPDATE envios
-SET courier_id = NULL
-WHERE courier_id IS NOT NULL
-  AND CAST(courier_id AS CHAR) NOT REGEXP '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
-ALTER TABLE envios MODIFY COLUMN courier_id VARCHAR(36) NULL;
-
-SET @drop_repartidor_id = (
-    SELECT IF(COUNT(*) > 0,
-        'ALTER TABLE envios DROP COLUMN repartidor_id',
-        'SELECT 1')
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'envios'
-      AND COLUMN_NAME = 'repartidor_id'
-);
-PREPARE migration_stmt FROM @drop_repartidor_id;
-EXECUTE migration_stmt;
-DEALLOCATE PREPARE migration_stmt;
-
-DROP TABLE IF EXISTS repartidores;
-
 CREATE TABLE IF NOT EXISTS historial_estados_envio (
     id BINARY(16) NOT NULL,
     envio_id BINARY(16) NOT NULL,
@@ -122,78 +65,3 @@ CREATE TABLE IF NOT EXISTS historial_estados_envio (
         REFERENCES envios(id)
 );
 
-INSERT INTO clientes (
-    id,
-    nombre,
-    email,
-    telefono,
-    fecha_creacion,
-    fecha_ultima_actualizacion
-) VALUES (
-    UUID_TO_BIN('11111111-1111-4111-8111-111111111111'),
-    'Juan Perez',
-    'juan.perez@email.com',
-    '3884123456',
-    NOW(6),
-    NOW(6)
-)
-ON DUPLICATE KEY UPDATE id = id;
-
-
-INSERT INTO envios (
-    id,
-    codigo_seguimiento,
-    peso,
-    ancho,
-    alto,
-    largo,
-    estado,
-    origen_calle,
-    origen_numero,
-    origen_ciudad,
-    origen_codigo_postal,
-    destino_calle,
-    destino_numero,
-    destino_ciudad,
-    destino_codigo_postal,
-    cliente_id,
-    courier_id,
-    fecha_creacion,
-    fecha_ultima_actualizacion
-) VALUES (
-    UUID_TO_BIN('33333333-3333-4333-8333-333333333333'),
-    'ENV-000001',
-    2.5,
-    20.0,
-    15.0,
-    30.0,
-    'EN_RUTA',
-    'San Martin',
-    '123',
-    'San Salvador de Jujuy',
-    '4600',
-    'Belgrano',
-    '456',
-    'Palpala',
-    '4612',
-    UUID_TO_BIN('11111111-1111-4111-8111-111111111111'),
-    NULL,
-    NOW(6),
-    NOW(6)
-)
-ON DUPLICATE KEY UPDATE id = id;
-
-INSERT INTO historial_estados_envio (
-    id,
-    envio_id,
-    estado_anterior,
-    estado_nuevo,
-    fecha_cambio
-) VALUES (
-    UUID_TO_BIN('44444444-4444-4444-8444-444444444444'),
-    UUID_TO_BIN('33333333-3333-4333-8333-333333333333'),
-    'PENDIENTE',
-    'EN_RUTA',
-    NOW(6)
-)
-ON DUPLICATE KEY UPDATE id = id;

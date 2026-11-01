@@ -7,8 +7,6 @@ import com.logirock.shipment_service.dto.ErrorResponseDto;
 import com.logirock.shipment_service.dto.EstadoEnvioRequestDto;
 import com.logirock.shipment_service.dto.HistorialEstadoEnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
-import com.logirock.shipment_service.models.Cliente;
-import com.logirock.shipment_service.models.Envio;
 import com.logirock.shipment_service.services.EnvioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -34,7 +32,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/envios")
+@RequestMapping("/api/v1/envios")
 @RequiredArgsConstructor
 @Tag(name = "Envíos", description = "Creación, seguimiento, consulta y cancelación de envíos")
 public class EnvioController {
@@ -55,21 +53,7 @@ public class EnvioController {
                         @AuthenticationPrincipal Jwt jwt) {
 
                 UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
-
-                Envio envio = new Envio();
-
-                envio.setPeso(request.getPeso());
-                envio.setAncho(request.getAncho());
-                envio.setAlto(request.getAlto());
-                envio.setLargo(request.getLargo());
-                envio.setOrigen(request.getOrigen());
-                envio.setDestino(request.getDestino());
-
-                // Envio creado = envioService.crear(envio, request.getClienteId());
-
-                Envio creado = envioService.crear(envio, userId);
-
-                return convertirAResponse(creado);
+                return envioService.crear(request, userId);
         }
 
         @GetMapping
@@ -112,26 +96,16 @@ public class EnvioController {
 
                 List<String> roles = jwt.getClaimAsStringList("roles");
 
-                Envio envio;
-
                 if (roles != null && roles.contains("ROLE_ADMIN")) {
-
-                        envio = envioService.buscarPorId(id);
-
+                        return envioService.buscarPorId(id);
                 } else if (roles != null && roles.contains("ROLE_CLIENTE")) {
-
-                        UUID userId = UUID.fromString(
-                                        jwt.getClaimAsString("userId"));
-
-                        envio = envioService.buscarPorIdParaUsuario(id, userId);
-
+                        UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
+                        return envioService.buscarPorIdParaUsuario(id, userId);
                 } else {
                         throw new ResponseStatusException(
-                                        HttpStatus.FORBIDDEN,
-                                        "No tenés permisos para consultar este envío");
+                                HttpStatus.FORBIDDEN,
+                                "No tenés permisos para consultar este envío");
                 }
-
-                return convertirAResponse(envio);
         }
 
         @GetMapping("/seguimiento/{codigo}")
@@ -145,26 +119,16 @@ public class EnvioController {
                         @AuthenticationPrincipal Jwt jwt) {
                 List<String> roles = jwt.getClaimAsStringList("roles");
 
-                Envio envio;
-
                 if (roles != null && roles.contains("ROLE_ADMIN")) {
-
-                        envio = envioService.buscarPorCodigoSeguimiento(codigo);
-
+                        return envioService.buscarPorCodigoSeguimiento(codigo);
                 } else if (roles != null && roles.contains("ROLE_CLIENTE")) {
-
-                        UUID userId = UUID.fromString(
-                                        jwt.getClaimAsString("userId"));
-
-                        envio = envioService.buscarPorCodigoParaUsuario(codigo, userId);
-
+                        UUID userId = UUID.fromString(jwt.getClaimAsString("userId"));
+                        return envioService.buscarPorCodigoParaUsuario(codigo, userId);
                 } else {
                         throw new ResponseStatusException(
-                                        HttpStatus.FORBIDDEN,
-                                        "No tenés permisos para consultar este envío");
+                                HttpStatus.FORBIDDEN,
+                                "No tenés permisos para consultar este envío");
                 }
-
-                return convertirAResponse(envio);
         }
 
         @PutMapping("/{id}")
@@ -178,19 +142,7 @@ public class EnvioController {
                         @Parameter(description = "UUID del envío", required = true) @PathVariable UUID id,
                         @Valid @RequestBody EnvioRequestDto request) {
 
-                Envio datos = new Envio();
-                datos.setPeso(request.getPeso());
-                datos.setAncho(request.getAncho());
-                datos.setAlto(request.getAlto());
-                datos.setLargo(request.getLargo());
-                datos.setOrigen(request.getOrigen());
-                datos.setDestino(request.getDestino());
-
-                Cliente cliente = new Cliente();
-                ///cliente.setId(request.getClienteId());
-                datos.setCliente(cliente);
-
-                return convertirAResponse(envioService.actualizar(id, datos));
+                return envioService.actualizar(id, request);
         }
 
         @DeleteMapping("/{id}")
@@ -204,36 +156,16 @@ public class EnvioController {
                 envioService.eliminar(id);
         }
 
-        private EnvioResponseDto convertirAResponse(Envio envio) {
-                return new EnvioResponseDto(
-                                envio.getId(),
-                                envio.getCodigoSeguimiento(),
-                                envio.getPeso(),
-                                envio.getAncho(),
-                                envio.getAlto(),
-                                envio.getLargo(),
-                                envio.getEstado(),
-
-                                envio.getCourierId(),
-                                envio.getCliente().getId(),
-                                envio.getCliente().getNombre(),
-                                envio.getOrigen(),
-                                envio.getDestino());
-        }
-
         @GetMapping("/estado/{estado}")
         @Operation(summary = "Filtrar envíos por estado", description = "Estados permitidos: PENDIENTE, EN_RUTA, ENTREGADO y CANCELADO.")
         @ApiResponses({
                         @ApiResponse(responseCode = "200", description = "Envíos del estado solicitado"),
                         @ApiResponse(responseCode = "400", description = "Estado no reconocido", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
         })
-        public List<EnvioResponseDto> buscarPorEstado(
-                        @Parameter(description = "Estado del envío", example = "PENDIENTE", required = true) @PathVariable EstadoEnvio estado) {
 
-                return envioService.findByEstado(estado)
-                                .stream()
-                                .map(this::convertirAResponse)
-                                .toList();
+        public List<EnvioResponseDto> buscarPorEstado(
+                @Parameter(description = "Estado del envío", example = "PENDIENTE", required = true) @PathVariable EstadoEnvio estado) {
+                return envioService.findByEstado(estado);
         }
 
         @PostMapping("/{id}/cancelacion")
@@ -258,11 +190,10 @@ public class EnvioController {
                         @ApiResponse(responseCode = "409", description = "El envío no está pendiente o ya tiene otro courier", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
         })
         public ResponseEntity<EnvioResponseDto> asignarCourier(
-                        @Parameter(description = "UUID del envío", required = true) @PathVariable UUID envioId,
-                        @Parameter(description = "UUID del courier", required = true) @PathVariable UUID courierId,
+                @Parameter(description = "UUID del envío", required = true) @PathVariable UUID envioId,
+                @Parameter(description = "UUID del courier", required = true) @PathVariable UUID courierId,
                 @AuthenticationPrincipal Jwt jwt) {
-                Envio envio = envioService.asignarCourier(envioId, courierId, jwt.getTokenValue());
-                return ResponseEntity.ok(convertirAResponse(envio));
+                return ResponseEntity.ok(envioService.asignarCourier(envioId, courierId, jwt.getTokenValue()));
         }
 
         @PatchMapping("/{id}/estado")
@@ -279,24 +210,18 @@ public class EnvioController {
                         @AuthenticationPrincipal Jwt jwt) {
                 List<String> roles = jwt.getClaimAsStringList("roles");
 
-                Envio envio;
-
                 if (roles.contains("ROLE_ADMIN")) {
-                        envio = envioService.cambiarEstado(id, request.getEstado());
-
+                        return envioService.cambiarEstado(id, request.getEstado());
                 } else if (roles.contains("ROLE_REPARTIDOR")) {
-                        envio = envioService.cambiarEstadoParaRepartidor(
-                                        id,
-                                        request.getEstado(),
-                                        jwt.getTokenValue());
-
+                        return envioService.cambiarEstadoParaRepartidor(
+                                id,
+                                request.getEstado(),
+                                jwt.getTokenValue());
                 } else {
                         throw new ResponseStatusException(
-                                        HttpStatus.FORBIDDEN,
-                                        "No tenés permisos para cambiar el estado del envío");
+                                HttpStatus.FORBIDDEN,
+                                "No tenés permisos para cambiar el estado del envío");
                 }
-
-                return convertirAResponse(envio);
         }
 
         @GetMapping("/{id}/historial")
@@ -307,15 +232,7 @@ public class EnvioController {
         })
         public List<HistorialEstadoEnvioResponseDto> consultarHistorial(
                         @Parameter(description = "UUID del envío", required = true) @PathVariable UUID id) {
-
-                return envioService.consultarHistorial(id)
-                                .stream()
-                                .map(historial -> new HistorialEstadoEnvioResponseDto(
-                                                historial.getId(),
-                                                historial.getEstadoAnterior(),
-                                                historial.getEstadoNuevo(),
-                                                historial.getFechaCambio()))
-                                .toList();
+                return envioService.consultarHistorial(id);
         }
 
 }
