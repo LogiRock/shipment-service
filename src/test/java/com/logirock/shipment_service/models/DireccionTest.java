@@ -36,9 +36,6 @@ class DireccionTest {
      */
     private static Validator validator;
 
-    /**
-     * Repositorio simulado para verificar la persistencia.
-     */
     @Mock
     private EnvioRepository envioRepository;
 

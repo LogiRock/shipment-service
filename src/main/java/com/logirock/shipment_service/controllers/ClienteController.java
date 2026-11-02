@@ -37,19 +37,6 @@ public class ClienteController {
 
         private final ClienteService clienteService;
 
-        // @PostMapping
-        // @Operation(summary = "Registrar cliente", description = "Crea un cliente con nombre, email y teléfono únicos.")
-        // @ApiResponses({
-        //                 @ApiResponse(responseCode = "201", description = "Cliente registrado"),
-        //                 @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
-        //                 @ApiResponse(responseCode = "409", description = "Email o teléfono ya registrado", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
-        // })
-        // public ResponseEntity<ClienteResponseDto> registrarCliente(@Valid @RequestBody ClienteRequestDto request) {
-        //         ClienteResponseDto response = clienteService.registrarCliente(request);
-        //         return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        // }
-
-        //nuevo registrar
         @PostMapping
         @Operation(summary = "Registrar cliente", description = "Crea un cliente y su cuenta de acceso.")
         @ApiResponses({

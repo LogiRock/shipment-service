@@ -68,10 +68,6 @@ public class Envio extends Auditable{
     @Column(nullable = false, length = 20)
     private EstadoEnvio estado;
 
-    /**
-     * Dirección de origen desde donde parte el envío.
-     * Se sobreescriben los nombres de las columnas con el prefijo origen_.
-     */
     @Embedded
     @AttributeOverrides({
             @AttributeOverride(name = "calle", column = @Column(name = "origen_calle", nullable = false)),
@@ -81,10 +77,6 @@ public class Envio extends Auditable{
     })
     private Direccion origen;
 
-    /**
-     * Dirección de destino hacia donde se dirige el envío.
-     * Se sobreescriben los nombres de las columnas con el prefijo destino_.
-     */
     @Embedded
     @AttributeOverrides({
             @AttributeOverride(name = "calle", column = @Column(name = "destino_calle", nullable = false)),
@@ -94,8 +86,6 @@ public class Envio extends Auditable{
     })
     private Direccion destino;
 
-
-    /** Identificador lógico del courier asignado en courier-service. */
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "courier_id", length = 36)
     private UUID courierId;

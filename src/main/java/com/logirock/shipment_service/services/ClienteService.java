@@ -7,7 +7,6 @@ import com.logirock.shipment_service.dto.RegistroClienteRequestDto;
 import com.logirock.shipment_service.models.Cliente;
 
 public interface ClienteService {
-    //ClienteResponseDto registrarCliente(ClienteRequestDto request);
     ClienteResponseDto registrarCliente(RegistroClienteRequestDto request);
     ClienteResponseDto obtenerCliente(UUID id);
     ClienteResponseDto modificarCliente(UUID id, ClienteRequestDto request);
