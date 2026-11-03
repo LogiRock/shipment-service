@@ -2,6 +2,7 @@ package com.logirock.shipment_service.controllers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 import java.util.UUID;
 
@@ -12,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
@@ -27,6 +29,23 @@ class EnvioControllerTest {
 
     @InjectMocks
     private EnvioController envioController;
+
+    @Test
+    void asignarCourierDevuelve200CuandoLaAsignacionEsExitosa() {
+        UUID envioId = UUID.randomUUID();
+        UUID courierId = UUID.randomUUID();
+        Jwt jwt = mock(Jwt.class);
+        when(jwt.getTokenValue()).thenReturn("token-de-prueba");
+        EnvioResponseDto responseDto = new EnvioResponseDto();
+        responseDto.setId(envioId);
+        responseDto.setCourierId(courierId);
+        when(envioService.asignarCourier(envioId, courierId, "token-de-prueba")).thenReturn(responseDto);
+
+        ResponseEntity<EnvioResponseDto> response = envioController.asignarCourier(envioId, courierId, jwt);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(courierId, response.getBody().getCourierId());
+    }
 
     @Test
     void cancelarEnvioRetornaRespuestaExitosaConEstadoCancelado() {

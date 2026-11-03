@@ -2,6 +2,7 @@ package com.logirock.shipment_service.exceptions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,9 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.logirock.shipment_service.dto.ErrorResponseDto;
+import com.logirock.shipment_service.exceptions.CourierServiceNoDisponibleException;
+import com.logirock.shipment_service.exceptions.RepartidorNoEncontradoException;
+import com.logirock.shipment_service.exceptions.TransicionInvalidaException;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -58,6 +62,45 @@ class GlobalExceptionHandlerTest {
         assertEquals(404, respuesta.getBody().getStatus());
         assertEquals("Recurso no encontrado", respuesta.getBody().getMessage());
         assertEquals("/api/v1/clientes/1", respuesta.getBody().getPath());
+    }
+
+    @Test
+    void deberiaRetornarNotFound_CuandoCourierNoExiste() {
+        when(webRequest.getDescription(false)).thenReturn("uri=/api/v1/envios/1/courier/2");
+
+        ResponseEntity<ErrorResponseDto> respuesta = globalExceptionHandler
+                .handleRepartidorNoEncontradoException(
+                        new RepartidorNoEncontradoException("El courier solicitado no existe."), webRequest);
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+        assertEquals(404, respuesta.getBody().getStatus());
+        assertEquals("El courier solicitado no existe.", respuesta.getBody().getMessage());
+    }
+
+    @Test
+    void deberiaRetornarConflict_CuandoCourierEstaInactivo() {
+        when(webRequest.getDescription(false)).thenReturn("uri=/api/v1/envios/1/courier/2");
+
+        ResponseEntity<ErrorResponseDto> respuesta = globalExceptionHandler
+                .handleTransicionInvalidaException(
+                        new TransicionInvalidaException("El courier está inactivo; no se puede asignar el envío."), webRequest);
+
+        assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
+        assertEquals(409, respuesta.getBody().getStatus());
+        assertTrue(respuesta.getBody().getMessage().contains("inactivo"));
+    }
+
+    @Test
+    void deberiaRetornarServiceUnavailable_CuandoCourierServiceNoResponde() {
+        when(webRequest.getDescription(false)).thenReturn("uri=/api/v1/envios/1/courier/2");
+
+        ResponseEntity<ErrorResponseDto> respuesta = globalExceptionHandler
+                .handleCourierServiceNoDisponibleException(
+                        new CourierServiceNoDisponibleException("Courier Service no está disponible."), webRequest);
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, respuesta.getStatusCode());
+        assertEquals(503, respuesta.getBody().getStatus());
+        assertEquals("Courier Service no está disponible.", respuesta.getBody().getMessage());
     }
 
     /**

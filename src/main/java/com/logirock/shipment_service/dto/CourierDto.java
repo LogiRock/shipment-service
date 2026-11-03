@@ -1,13 +1,16 @@
 package com.logirock.shipment_service.dto;
 
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.logirock.shipment_service.enums.EstadoRepartidor;
+import lombok.Getter;
+import lombok.Setter;
 
+/** Datos mínimos del courier necesarios para validar una asignación. */
+@Getter
+@Setter
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CourierDto {
     private UUID id;
-    private String estado;
-
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public String getEstado() { return estado; }
-    public void setEstado(String estado) { this.estado = estado; }
+    private EstadoRepartidor estado;
 }

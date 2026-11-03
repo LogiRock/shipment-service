@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/envios")
 @RequiredArgsConstructor
 @Tag(name = "Envíos", description = "Creación, seguimiento, consulta y cancelación de envíos")
+@SecurityRequirement(name = "bearerAuth")
 public class EnvioController {
 
         private final EnvioService envioService;
@@ -185,9 +187,8 @@ public class EnvioController {
         @ApiResponses({
                         @ApiResponse(responseCode = "200", description = "Courier activo asignado", content = @Content(schema = @Schema(implementation = EnvioResponseDto.class), examples = @ExampleObject(value = "{\"id\":\"9b715c47-1a23-4b70-a146-fbf0ff47b001\",\"codigoSeguimiento\":\"ENV-A1B2C3D4\",\"peso\":2.5,\"ancho\":10.0,\"alto\":20.0,\"largo\":30.0,\"estado\":\"PENDIENTE\",\"courierId\":\"1b6e8c5a-64f9-4e2a-ae1e-4e5da04533fd\"}"))),
                         @ApiResponse(responseCode = "404", description = "Envío o courier inexistente", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
-                        @ApiResponse(responseCode = "400", description = "Courier inactivo o inválido", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
-                        @ApiResponse(responseCode = "503", description = "Courier Service no disponible", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
-                        @ApiResponse(responseCode = "409", description = "El envío no está pendiente o ya tiene otro courier", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
+                        @ApiResponse(responseCode = "409", description = "Courier inactivo o inválido, o el envío no admite otra asignación", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class))),
+                        @ApiResponse(responseCode = "503", description = "Courier Service no disponible", content = @Content(schema = @Schema(implementation = ErrorResponseDto.class)))
         })
         public ResponseEntity<EnvioResponseDto> asignarCourier(
                 @Parameter(description = "UUID del envío", required = true) @PathVariable UUID envioId,

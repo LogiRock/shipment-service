@@ -66,6 +66,20 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(RepartidorNoEncontradoException.class)
+    public ResponseEntity<ErrorResponseDto> handleRepartidorNoEncontradoException(
+            RepartidorNoEncontradoException ex, WebRequest request) {
+        log.warn("Courier no encontrado: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(CourierServiceNoDisponibleException.class)
+    public ResponseEntity<ErrorResponseDto> handleCourierServiceNoDisponibleException(
+            CourierServiceNoDisponibleException ex, WebRequest request) {
+        log.warn("Courier Service no disponible: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request);
+    }
+
     // Nuevo handler: TransicionInvalidaException -> 409
     @ExceptionHandler(TransicionInvalidaException.class)
     public ResponseEntity<ErrorResponseDto> handleTransicionInvalidaException(TransicionInvalidaException ex, WebRequest request) {

@@ -3,6 +3,7 @@ target/
 .maven-tmp/
 .env
 !.env.example
+docker-compose.override.yml
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

@@ -61,11 +61,11 @@ java -jar .\target\shipment-service-0.0.1-SNAPSHOT.jar
 | `DB_DATABASE_NAME` | Base de datos | `shipment_service` |
 | `DB_USERNAME` | Usuario local de la base | `<usuario_local>` |
 | `DB_PASSWORD` | Contraseña local de la base | `<contraseña_local>` |
-| `COURIER_SERVICE_URL` | URL base de Courier Service | `http://localhost:8082` |
+| `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` | URL de Eureka para descubrir Courier Service | `http://localhost:8065/eureka/` |
 
 No guardar contraseñas ni secretos reales en el repositorio. En esta revisión se quitó `.env` del índice de Git sin borrar la copia local; `.gitignore` lo excluye de futuros commits. `.env.example` contiene solo nombres de variables y valores ficticios. Si el archivo versionado anteriormente incluía credenciales reales, deben rotarse: quitarlo del commit actual no elimina las versiones históricas del repositorio.
 
-Para ejecutar shipment fuera de Docker, Courier Service debe estar disponible en `http://localhost:8082` o se debe definir `COURIER_SERVICE_URL`. En Docker Compose se usa por defecto `http://host.docker.internal:8082`, por lo que Courier Service debe exponer ese puerto en el host.
+La consulta entre Shipment Service y Courier Service usa OpenFeign con el nombre lógico `courier-service`, resuelto por Eureka. Iniciá Eureka Server y asegurate de que Courier Service esté registrado con ese nombre antes de probar la asignación. En ejecución local, configurá `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE` (por defecto `http://localhost:8065/eureka/`); Docker Compose usa por defecto `http://host.docker.internal:8065/eureka/`. La tolerancia a fallos está habilitada con Circuit Breaker y responde `503` si Courier Service no está disponible.
 
 ## Swagger / OpenAPI
 
@@ -145,7 +145,7 @@ La respuesta de envío contiene `id`, `codigoSeguimiento`, dimensiones, `estado`
 
 #### Asignar un courier
 
-Ejemplo: `PUT /api/v1/envios/9b715c47-1a23-4b70-a146-fbf0ff47b001/courier/1b6e8c5a-64f9-4e2a-ae1e-4e5da04533fd`. No requiere cuerpo. Shipment Service consulta `GET /api/v1/repartidores/{id}` en Courier Service y solo asigna el UUID si el courier existe y está `ACTIVO`. El envío debe estar `PENDIENTE` y no puede cambiar a otro courier una vez asignado. Si no existe responde `404`, si está inactivo `400`, y si Courier Service no está disponible `503`; en todos esos casos no se persiste la asignación.
+Ejemplo: `PUT /api/v1/envios/9b715c47-1a23-4b70-a146-fbf0ff47b001/courier/1b6e8c5a-64f9-4e2a-ae1e-4e5da04533fd`. No requiere cuerpo. Shipment Service consulta `GET /api/v1/repartidores/{id}` en Courier Service y solo asigna el UUID si el courier existe y está `ACTIVO`. El envío debe estar `PENDIENTE` y no puede cambiar a otro courier una vez asignado. Si no existe responde `404`, si está inactivo `409`, y si Courier Service no está disponible `503`; en todos esos casos no se persiste la asignación.
 
 #### Cambiar el estado
 

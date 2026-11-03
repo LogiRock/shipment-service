@@ -2,21 +2,22 @@ package com.logirock.shipment_service.services.impl;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.logirock.shipment_service.clients.CourierClient;
 import com.logirock.shipment_service.dto.CourierDto;
 import com.logirock.shipment_service.dto.EnvioMapper;
 import com.logirock.shipment_service.dto.EnvioRequestDto;
 import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
+import com.logirock.shipment_service.enums.EstadoRepartidor;
+import com.logirock.shipment_service.exceptions.CourierServiceNoDisponibleException;
 import com.logirock.shipment_service.exceptions.EnvioNoEncontradoException;
+import com.logirock.shipment_service.exceptions.RepartidorNoEncontradoException;
 import com.logirock.shipment_service.exceptions.TransicionInvalidaException;
 import com.logirock.shipment_service.models.Cliente;
 import com.logirock.shipment_service.models.Envio;
@@ -30,16 +31,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.RestTemplate;
 
 @ExtendWith(MockitoExtension.class)
 class EnvioServiceImplTest {
     @Mock private EnvioRepository envioRepository;
     @Mock private HistorialEstadoEnvioRepository historialRepository;
     @Mock private ClienteService clienteService;
-    @Mock private RestTemplate restTemplate;
+    @Mock private CourierClient courierClient;
+    @Mock private EnvioAssignmentWriter envioAssignmentWriter;
     @InjectMocks private EnvioServiceImpl envioService;
 
     private UUID id;
@@ -48,7 +48,6 @@ class EnvioServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(envioService, "courierUrl", "http://localhost:8082");
         ReflectionTestUtils.setField(envioService, "envioMapper", new EnvioMapper());
         id = UUID.randomUUID();
         cliente = new Cliente();
@@ -143,19 +142,65 @@ class EnvioServiceImplTest {
     }
 
     @Test
-    void asignarCourierConsultaServicioExternoYDevuelveDto() {
+    void asignarCourierActivoConsultaFeignYPersisteIdLogico() {
         UUID courierId = UUID.randomUUID();
-        CourierDto courier = new CourierDto();
-        courier.setId(courierId);
-        courier.setEstado("ACTIVO");
+        CourierDto courier = courier(courierId, EstadoRepartidor.ACTIVO);
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
-        when(restTemplate.exchange(anyString(), any(), any(), eq(CourierDto.class)))
-                .thenReturn(ResponseEntity.ok(courier));
-        when(envioRepository.save(envio)).thenReturn(envio);
+        when(courierClient.obtenerRepartidor(courierId)).thenReturn(courier);
+        EnvioResponseDto asignado = new EnvioResponseDto();
+        asignado.setId(id);
+        asignado.setCourierId(courierId);
+        when(envioAssignmentWriter.guardarAsignacion(id, courierId)).thenReturn(asignado);
 
         EnvioResponseDto response = envioService.asignarCourier(id, courierId, "jwt");
 
         assertEquals(courierId, response.getCourierId());
-        verify(restTemplate).exchange(contains("/api/v1/repartidores/" + courierId), any(), any(), eq(CourierDto.class));
+        verify(courierClient).obtenerRepartidor(courierId);
+        verify(envioAssignmentWriter).guardarAsignacion(id, courierId);
+    }
+
+    @Test
+    void asignarCourierInexistentePropagaNotFoundYNoModificaEnvio() {
+        UUID courierId = UUID.randomUUID();
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(courierClient.obtenerRepartidor(courierId))
+                .thenThrow(new RepartidorNoEncontradoException("El courier solicitado no existe."));
+
+        assertThrows(RepartidorNoEncontradoException.class,
+                () -> envioService.asignarCourier(id, courierId, "jwt"));
+        verify(envioAssignmentWriter, never()).guardarAsignacion(any(), any());
+        assertNull(envio.getCourierId());
+    }
+
+    @Test
+    void asignarCourierInactivoDevuelveConflictoYNoModificaEnvio() {
+        UUID courierId = UUID.randomUUID();
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(courierClient.obtenerRepartidor(courierId)).thenReturn(courier(courierId, EstadoRepartidor.INACTIVO));
+
+        assertThrows(TransicionInvalidaException.class,
+                () -> envioService.asignarCourier(id, courierId, "jwt"));
+        verify(envioAssignmentWriter, never()).guardarAsignacion(any(), any());
+        assertNull(envio.getCourierId());
+    }
+
+    @Test
+    void courierCaidoPropagaServiceUnavailableYNoModificaEnvio() {
+        UUID courierId = UUID.randomUUID();
+        when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
+        when(courierClient.obtenerRepartidor(courierId))
+                .thenThrow(new CourierServiceNoDisponibleException("Courier Service no está disponible."));
+
+        assertThrows(CourierServiceNoDisponibleException.class,
+                () -> envioService.asignarCourier(id, courierId, "jwt"));
+        verify(envioAssignmentWriter, never()).guardarAsignacion(any(), any());
+        assertNull(envio.getCourierId());
+    }
+
+    private CourierDto courier(UUID courierId, EstadoRepartidor estado) {
+        CourierDto courier = new CourierDto();
+        courier.setId(courierId);
+        courier.setEstado(estado);
+        return courier;
     }
 }

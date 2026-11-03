@@ -1,6 +1,10 @@
 package com.logirock.shipment_service.services.impl;
 
+import com.logirock.shipment_service.clients.CourierClient;
 import com.logirock.shipment_service.dto.CourierDto;
+import com.logirock.shipment_service.enums.EstadoRepartidor;
+import com.logirock.shipment_service.exceptions.RepartidorNoEncontradoException;
+import com.logirock.shipment_service.exceptions.CourierServiceNoDisponibleException;
 import com.logirock.shipment_service.dto.EnvioMapper;
 import com.logirock.shipment_service.dto.EnvioRequestDto;
 import com.logirock.shipment_service.dto.EnvioResponseDto;
@@ -19,21 +23,13 @@ import com.logirock.shipment_service.services.EnvioService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 
 @Service
 @Slf4j
@@ -47,10 +43,8 @@ public class EnvioServiceImpl implements EnvioService {
     private final HistorialEstadoEnvioRepository historialRepository;
     private final ClienteService clienteService;
     private final EnvioMapper envioMapper;
-    private final RestTemplate restTemplate;
-
-    @Value("${courier.service.url:http://localhost:8082}")
-    private String courierUrl;
+    private final CourierClient courierClient;
+    private final EnvioAssignmentWriter envioAssignmentWriter;
 
     @Override
     public EnvioResponseDto crear(EnvioRequestDto peticion, UUID userId) {
@@ -126,6 +120,7 @@ public class EnvioServiceImpl implements EnvioService {
     }
 
     @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public EnvioResponseDto asignarCourier(UUID envioId, UUID courierId, String token) {
         Envio envio = obtenerEntidadPorId(envioId);
 
@@ -139,10 +134,8 @@ public class EnvioServiceImpl implements EnvioService {
             throw new TransicionInvalidaException("El envío ya tiene asignado otro courier.");
         }
 
-        verificarCourier(courierId, token);
-
-        envio.setCourierId(courierId);
-        return envioMapper.toDto(envioRepository.save(envio));
+        validarCourierDisponible(courierId);
+        return envioAssignmentWriter.guardarAsignacion(envioId, courierId);
     }
 
     @Override
@@ -270,47 +263,25 @@ public class EnvioServiceImpl implements EnvioService {
         return codigo;
     }
 
-    private void verificarCourier(UUID courierId, String token) {
+    private void validarCourierDisponible(UUID courierId) {
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(token);
-            HttpEntity<Void> request = new HttpEntity<>(headers);
-            ResponseEntity<CourierDto> response = restTemplate.exchange(
-                    courierUrl + "/api/v1/repartidores/" + courierId,
-                    HttpMethod.GET, request, CourierDto.class);
-
-            CourierDto courier = response.getBody();
+            CourierDto courier = courierClient.obtenerRepartidor(courierId);
             if (courier == null || !courierId.equals(courier.getId())) {
-                throw new EnvioNoEncontradoException("El repartidor no existe o la respuesta no es válida.");
+                throw new CourierServiceNoDisponibleException("Courier Service devolvió una respuesta inválida.");
             }
-            if (!"ACTIVO".equalsIgnoreCase(courier.getEstado())) {
-                throw new TransicionInvalidaException("El repartidor está INACTIVO; no se puede asignar el envío.");
+            if (courier.getEstado() != EstadoRepartidor.ACTIVO) {
+                throw new TransicionInvalidaException("El courier está inactivo; no se puede asignar el envío.");
             }
-        } catch (HttpClientErrorException.NotFound e) {
-            throw new EnvioNoEncontradoException("El repartidor no existe en courier-service");
-        } catch (ResourceAccessException e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "No se pudo conectar con courier-service");
-        } catch (HttpClientErrorException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "courier-service rechazó la consulta");
+        } catch (RepartidorNoEncontradoException | CourierServiceNoDisponibleException ex) {
+            throw ex;
         }
     }
 
     private UUID obtenerCourierIdAutenticado(String token) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(token);
-            HttpEntity<Void> request = new HttpEntity<>(headers);
-            ResponseEntity<CourierDto> response = restTemplate.exchange(
-                    courierUrl + "/api/v1/repartidores/me",
-                    HttpMethod.GET, request, CourierDto.class);
-
-            CourierDto courier = response.getBody();
-            if (courier == null || courier.getId() == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo identificar al repartidor autenticado");
-            }
-            return courier.getId();
-        } catch (ResourceAccessException e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "No se pudo conectar con courier-service");
+        CourierDto courier = courierClient.obtenerRepartidorAutenticado();
+        if (courier == null || courier.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo identificar al repartidor autenticado");
         }
+        return courier.getId();
     }
 }
