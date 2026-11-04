@@ -9,12 +9,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.logirock.shipment_service.clients.CourierClient;
-import com.logirock.shipment_service.dto.CourierDto;
 import com.logirock.shipment_service.dto.EnvioMapper;
 import com.logirock.shipment_service.dto.EnvioRequestDto;
+import com.logirock.shipment_service.dto.DisponibilidadRepartidorResponseDto;
 import com.logirock.shipment_service.dto.EnvioResponseDto;
 import com.logirock.shipment_service.enums.EstadoEnvio;
-import com.logirock.shipment_service.enums.EstadoRepartidor;
 import com.logirock.shipment_service.exceptions.CourierServiceNoDisponibleException;
 import com.logirock.shipment_service.exceptions.EnvioNoEncontradoException;
 import com.logirock.shipment_service.exceptions.RepartidorNoEncontradoException;
@@ -144,9 +143,9 @@ class EnvioServiceImplTest {
     @Test
     void asignarCourierActivoConsultaFeignYPersisteIdLogico() {
         UUID courierId = UUID.randomUUID();
-        CourierDto courier = courier(courierId, EstadoRepartidor.ACTIVO);
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
-        when(courierClient.obtenerRepartidor(courierId)).thenReturn(courier);
+        when(courierClient.validarDisponibilidad(courierId))
+                .thenReturn(new DisponibilidadRepartidorResponseDto(true, null));
         EnvioResponseDto asignado = new EnvioResponseDto();
         asignado.setId(id);
         asignado.setCourierId(courierId);
@@ -155,7 +154,7 @@ class EnvioServiceImplTest {
         EnvioResponseDto response = envioService.asignarCourier(id, courierId, "jwt");
 
         assertEquals(courierId, response.getCourierId());
-        verify(courierClient).obtenerRepartidor(courierId);
+        verify(courierClient).validarDisponibilidad(courierId);
         verify(envioAssignmentWriter).guardarAsignacion(id, courierId);
     }
 
@@ -163,7 +162,7 @@ class EnvioServiceImplTest {
     void asignarCourierInexistentePropagaNotFoundYNoModificaEnvio() {
         UUID courierId = UUID.randomUUID();
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
-        when(courierClient.obtenerRepartidor(courierId))
+        when(courierClient.validarDisponibilidad(courierId))
                 .thenThrow(new RepartidorNoEncontradoException("El courier solicitado no existe."));
 
         assertThrows(RepartidorNoEncontradoException.class,
@@ -176,7 +175,8 @@ class EnvioServiceImplTest {
     void asignarCourierInactivoDevuelveConflictoYNoModificaEnvio() {
         UUID courierId = UUID.randomUUID();
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
-        when(courierClient.obtenerRepartidor(courierId)).thenReturn(courier(courierId, EstadoRepartidor.INACTIVO));
+        when(courierClient.validarDisponibilidad(courierId))
+                .thenReturn(new DisponibilidadRepartidorResponseDto(false, "El repartidor está INACTIVO."));
 
         assertThrows(TransicionInvalidaException.class,
                 () -> envioService.asignarCourier(id, courierId, "jwt"));
@@ -188,19 +188,12 @@ class EnvioServiceImplTest {
     void courierCaidoPropagaServiceUnavailableYNoModificaEnvio() {
         UUID courierId = UUID.randomUUID();
         when(envioRepository.findById(id)).thenReturn(Optional.of(envio));
-        when(courierClient.obtenerRepartidor(courierId))
+        when(courierClient.validarDisponibilidad(courierId))
                 .thenThrow(new CourierServiceNoDisponibleException("Courier Service no está disponible."));
 
         assertThrows(CourierServiceNoDisponibleException.class,
                 () -> envioService.asignarCourier(id, courierId, "jwt"));
         verify(envioAssignmentWriter, never()).guardarAsignacion(any(), any());
         assertNull(envio.getCourierId());
-    }
-
-    private CourierDto courier(UUID courierId, EstadoRepartidor estado) {
-        CourierDto courier = new CourierDto();
-        courier.setId(courierId);
-        courier.setEstado(estado);
-        return courier;
     }
 }
