@@ -6,6 +6,7 @@ import org.springframework.cloud.openfeign.FallbackFactory;
 import org.springframework.stereotype.Component;
 
 import com.logirock.shipment_service.dto.CourierDto;
+import com.logirock.shipment_service.dto.DisponibilidadRepartidorResponseDto;
 import com.logirock.shipment_service.exceptions.CourierServiceNoDisponibleException;
 import com.logirock.shipment_service.exceptions.RepartidorNoEncontradoException;
 
@@ -29,7 +30,7 @@ public class CourierFallbackFactory implements FallbackFactory<CourierClient> {
             }
             @Override public CourierDto obtenerRepartidor(UUID id) { throw mappedFailure(); }
             @Override public CourierDto obtenerRepartidorAutenticado() { throw mappedFailure(); }
-            @Override public Object validarDisponibilidad(UUID id) { throw mappedFailure(); }
+            @Override public DisponibilidadRepartidorResponseDto  validarDisponibilidad(UUID id) { throw mappedFailure(); }
         };
     }
 }

@@ -2,6 +2,7 @@ package com.logirock.shipment_service.services.impl;
 
 import com.logirock.shipment_service.clients.CourierClient;
 import com.logirock.shipment_service.dto.CourierDto;
+import com.logirock.shipment_service.dto.DisponibilidadRepartidorResponseDto;
 import com.logirock.shipment_service.enums.EstadoRepartidor;
 import com.logirock.shipment_service.exceptions.RepartidorNoEncontradoException;
 import com.logirock.shipment_service.exceptions.CourierServiceNoDisponibleException;
@@ -150,14 +151,15 @@ public class EnvioServiceImpl implements EnvioService {
 
         boolean transicionPermitida = (estadoActual == EstadoEnvio.PENDIENTE
                 && (nuevoEstado == EstadoEnvio.CANCELADO
-                || (nuevoEstado == EstadoEnvio.EN_RUTA && envio.getCourierId() != null)))
+                        || (nuevoEstado == EstadoEnvio.EN_RUTA && envio.getCourierId() != null)))
                 || (estadoActual == EstadoEnvio.EN_RUTA
-                && nuevoEstado == EstadoEnvio.ENTREGADO);
+                        && nuevoEstado == EstadoEnvio.ENTREGADO);
 
         if (!transicionPermitida) {
-            String motivo = (estadoActual == EstadoEnvio.PENDIENTE && nuevoEstado == EstadoEnvio.EN_RUTA && envio.getCourierId() == null)
-                    ? "No se puede poner el envío EN_RUTA sin asignarle un courier."
-                    : "Transición de estado no permitida: " + estadoActual + " -> " + nuevoEstado;
+            String motivo = (estadoActual == EstadoEnvio.PENDIENTE && nuevoEstado == EstadoEnvio.EN_RUTA
+                    && envio.getCourierId() == null)
+                            ? "No se puede poner el envío EN_RUTA sin asignarle un courier."
+                            : "Transición de estado no permitida: " + estadoActual + " -> " + nuevoEstado;
             throw new TransicionInvalidaException(motivo);
         }
 
@@ -221,7 +223,8 @@ public class EnvioServiceImpl implements EnvioService {
         Envio envio = obtenerEntidadPorId(envioId);
 
         if (envio.getCourierId() == null || !envio.getCourierId().equals(courierId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tenés permiso para modificar un envío que no tenés asignado");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "No tenés permiso para modificar un envío que no tenés asignado");
         }
 
         return cambiarEstado(envioId, nuevoEstado);
@@ -240,7 +243,8 @@ public class EnvioServiceImpl implements EnvioService {
     }
 
     private void verificarPropietario(Envio envio, UUID userId) {
-        if (envio.getCliente() == null || envio.getCliente().getUserId() == null || !envio.getCliente().getUserId().equals(userId)) {
+        if (envio.getCliente() == null || envio.getCliente().getUserId() == null
+                || !envio.getCliente().getUserId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tenés permiso para consultar este envío");
         }
     }
@@ -264,23 +268,28 @@ public class EnvioServiceImpl implements EnvioService {
     }
 
     private void validarCourierDisponible(UUID courierId) {
-        try {
-            CourierDto courier = courierClient.obtenerRepartidor(courierId);
-            if (courier == null || !courierId.equals(courier.getId())) {
-                throw new CourierServiceNoDisponibleException("Courier Service devolvió una respuesta inválida.");
-            }
-            if (courier.getEstado() != EstadoRepartidor.ACTIVO) {
-                throw new TransicionInvalidaException("El courier está inactivo; no se puede asignar el envío.");
-            }
-        } catch (RepartidorNoEncontradoException | CourierServiceNoDisponibleException ex) {
-            throw ex;
+
+        DisponibilidadRepartidorResponseDto disponibilidad = courierClient.validarDisponibilidad(courierId);
+
+        if (disponibilidad == null) {
+            throw new CourierServiceNoDisponibleException(
+                    "Courier Service devolvió una respuesta inválida.");
+        }
+
+        if (!disponibilidad.disponible()) {
+            String motivo = disponibilidad.motivo() != null
+                    ? disponibilidad.motivo()
+                    : "El courier no está disponible.";
+
+            throw new TransicionInvalidaException(motivo);
         }
     }
 
     private UUID obtenerCourierIdAutenticado(String token) {
         CourierDto courier = courierClient.obtenerRepartidorAutenticado();
         if (courier == null || courier.getId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo identificar al repartidor autenticado");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "No se pudo identificar al repartidor autenticado");
         }
         return courier.getId();
     }

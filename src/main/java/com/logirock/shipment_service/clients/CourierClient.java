@@ -1,13 +1,15 @@
 package com.logirock.shipment_service.clients;
 
 import com.logirock.shipment_service.dto.CourierDto;
+import com.logirock.shipment_service.dto.DisponibilidadRepartidorResponseDto;
+
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import java.util.UUID;
 
 @FeignClient(
-        name = "courier-service",
+        name = "COURIER-SERVICE",
         fallbackFactory = CourierFallbackFactory.class,
         configuration = CourierClientConfiguration.class)
 public interface CourierClient {
@@ -19,5 +21,5 @@ public interface CourierClient {
     CourierDto obtenerRepartidorAutenticado();
 
     @GetMapping("/api/v1/repartidores/{id}/disponibilidad")
-    Object validarDisponibilidad(@PathVariable("id") UUID id);
+    DisponibilidadRepartidorResponseDto validarDisponibilidad(@PathVariable("id") UUID id);
 }

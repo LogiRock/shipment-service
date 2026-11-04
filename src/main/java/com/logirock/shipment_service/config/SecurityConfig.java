@@ -54,7 +54,10 @@ public class SecurityConfig {
                         .hasAuthority("ROLE_ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/api/v1/envios/estado/**")
-                        .hasAuthority("ROLE_ADMIN")
+                        .hasAnyAuthority("ROLE_ADMIN", "ROLE_CLIENTE")
+
+                        .requestMatchers(HttpMethod.POST, "/api/v1/envios")
+                        .hasAnyAuthority("ROLE_ADMIN", "ROLE_CLIENTE")
 
                         .requestMatchers(HttpMethod.POST, "/api/v1/envios/*/cancelacion")
                         .hasAuthority("ROLE_ADMIN")
