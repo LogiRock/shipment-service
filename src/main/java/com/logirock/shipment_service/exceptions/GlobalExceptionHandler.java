@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.cloud.client.circuitbreaker.NoFallbackAvailableException;
 
+import feign.FeignException;
 import com.logirock.shipment_service.dto.ErrorResponseDto;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -122,6 +124,24 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.badRequest().body(errorResponse);
+    }
+    @ExceptionHandler(NoFallbackAvailableException.class)
+    public ResponseEntity<ErrorResponseDto> handleNoFallback(
+            NoFallbackAvailableException ex, WebRequest request) {
+        if (ex.getCause() instanceof FeignException fe) {
+            log.warn("security-service respondió {} al registrar el usuario", fe.status());
+            if (fe.status() == 409) {
+                return buildErrorResponse(HttpStatus.CONFLICT,
+                        "El nombre de usuario ya existe.", request);
+            }
+            if (fe.status() == 400) {
+                return buildErrorResponse(HttpStatus.BAD_REQUEST,
+                        "Los datos del usuario no son válidos.", request);
+            }
+        }
+        log.error("Falló la llamada a otro servicio", ex);
+        return buildErrorResponse(HttpStatus.SERVICE_UNAVAILABLE,
+                "No se pudo completar la operación. Intentá nuevamente.", request);
     }
 
     @ExceptionHandler(Exception.class)
